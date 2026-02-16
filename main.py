@@ -75,10 +75,10 @@ class Book(db.Model):
     year = db.Column(db.String(20), default="")
     cover = db.Column(db.String(500), default="")
 
-    # Open Library identifiers (these make covers much more accurate)
-    olid = db.Column(db.String(50), default="", index=True)     # e.g. "OL12345M" (edition id)
-    cover_i = db.Column(db.String(50), default="")              # e.g. "1234567"
-    isbn = db.Column(db.String(32), default="")                 # e.g. "9780141182636"
+    # Open Library identifiers 
+    olid = db.Column(db.String(50), default="", index=True)     
+    cover_i = db.Column(db.String(50), default="")              
+    isbn = db.Column(db.String(32), default="")                 
 
     __table_args__ = (db.UniqueConstraint("title", "author", name="uq_book_title_author"),)
 
@@ -112,7 +112,7 @@ def load_user(user_id):
 with app.app_context():
     db.create_all()
 
-    # add bio column if it doesn't exist yet (sqlite dev migration)
+    # add bio column  (sqlite dev migration)
     cols_user = [row[1] for row in db.session.execute(text("PRAGMA table_info(user)")).fetchall()]
     if "bio" not in cols_user:
         db.session.execute(text("ALTER TABLE user ADD COLUMN bio TEXT DEFAULT ''"))
@@ -130,7 +130,7 @@ with app.app_context():
 
 
 # -----------------------------------------------------------------------------
-# Demo Data (keep small; DB will hold the “proper app” library)
+# Demo Data 
 # -----------------------------------------------------------------------------
 BOOKS = [
     {"title": "The Great Gatsby", "author": "F. Scott Fitzgerald", "genre": "Classics", "rating": 4.40,
@@ -159,7 +159,7 @@ GENRES = [
 ]
 
 # ----------------------------
-# App/session preferences (very lightweight demo)
+# App/session preferences demo
 # ----------------------------
 LANGS = ["English", "Español", "Français", "Deutsch", "Italiano"]
 
@@ -418,7 +418,7 @@ def _ol_description_for(title: str, author: str = "", timeout: int = 10) -> str:
     if not docs:
         return ""
 
-    # pick the most relevant doc (basic scoring like your cover matcher)
+    # pick the most relevant doc (basic scoring like cover matcher)
     t_low = t.lower()
     a_low = a.lower()
 
@@ -586,7 +586,7 @@ CURATED_SHELVES = {
         ("The Shining", "Stephen King", "Horror"),
     ],
     "Trending": [
-        # keep curated for portfolio stability (no “random OL results”)
+        
         ("Fourth Wing", "Rebecca Yarros", "Fantasy"),
         ("Iron Flame", "Rebecca Yarros", "Fantasy"),
         ("The Seven Husbands of Evelyn Hugo", "Taylor Jenkins Reid", "Romance"),
@@ -640,7 +640,7 @@ def _ensure_seeded_curated(min_books: int = 250):
 
 
 with app.app_context():
-    # Auto-seed so the app feels “real” without manual adding
+    # Auto-seed so the app feels real without manual adding
     _ensure_seeded_curated(min_books=250)
 
 
@@ -715,7 +715,7 @@ def book_details(title):
     avg_rating = float(avg or 0.0)
 
     # Update the book dict rating so your template shows the real avg
-    book = dict(book)  # copy so we don't mutate the global list
+    book = dict(book)  
     book["rating"] = avg_rating
 
     # Convert Review rows into the dict shape your template expects
@@ -735,13 +735,13 @@ def book_details(title):
             "age": _time_ago(r.created),
         })
 
-    # Best-effort real description (fallback to your current placeholder)
+    # Best-effort real description 
     description = _ol_description_for(book.get("title", ""), book.get("author", "")) or (
         "A gripping, imaginative novel that explores power, control, and identity. "
         "This edition features a modern cover while preserving the timeless themes."
     )
 
-    # Optional recommendations (if you ever enable that section in template)
+    # Optional recommendations 
     top_rated = sorted(all_books_ui(), key=lambda b: b.get("rating", 0.0), reverse=True)[:8]
 
     return render_template(
@@ -755,7 +755,7 @@ def book_details(title):
 
 @app.route("/book/<title>/reviews")
 def book_reviews(title):
-    # Find the book from demo+DB (same logic as book_details)
+    # Find the book from demo+DB 
     book = next(
         (b for b in all_books_ui()
          if (b.get("title") or "").lower() == (title or "").lower()),
@@ -783,7 +783,7 @@ def book_reviews(title):
     avg_rating = float(avg or 0.0)
     review_count = len(rows)
 
-    # Template-friendly shape (same as your book_details)
+    # Template-friendly shape 
     reviews = []
     for r in rows:
         display_user = ""
@@ -1063,7 +1063,7 @@ def api_followers_remove():
     return {"ok": True}
 
 
-# ---------- Genre landing (pretty URL that reuses Browse) ----------
+# ---------- Genre landing  ----------
 @app.route("/genre/<name>")
 def genre_page(name):
     return redirect(url_for("browse", genre=name), code=302)
@@ -1168,7 +1168,9 @@ import os
 @login_required
 def edit_profile():
     if request.method == "POST":
+        # ----------------------------
         # Text fields
+        # ----------------------------
         new_name = (request.form.get("name") or "").strip()
         new_handle = (request.form.get("handle") or "").strip()
         new_bio = (request.form.get("bio") or "").strip()
@@ -1186,32 +1188,34 @@ def edit_profile():
         # ----------------------------
         # Profile picture upload
         # ----------------------------
-        file = request.files.get("profile_picture")
+        file = request.files.get("avatar")  
 
         if file and file.filename:
             filename = secure_filename(file.filename)
 
-            upload_folder = os.path.join("static", "uploads", "avatars")
-            os.makedirs(upload_folder, exist_ok=True)
+            
+            allowed_ext = {"png", "jpg", "jpeg", "webp"}
+            ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+            if ext in allowed_ext:
+                upload_folder = os.path.join("static", "uploads", "avatars")
+                os.makedirs(upload_folder, exist_ok=True)
 
-            filepath = os.path.join(upload_folder, filename)
-            file.save(filepath)
+                
+                base = filename.rsplit(".", 1)[0]
+                filename = f"user_{current_user.id}_{base}.{ext}"
 
-            # store path or filename on user model
-            current_user.avatar = f"uploads/avatars/{filename}"
+                filepath = os.path.join(upload_folder, filename)
+                file.save(filepath)
+
+                # Store path relative to /static because you do url_for('static', filename=user.avatar)
+                current_user.avatar = f"uploads/avatars/{filename}"
 
         db.session.commit()
         flash("Profile updated.", "ok")
         return redirect(url_for("profile_page"))
 
-    user = {
-        "name": current_user_name(),
-        "handle": current_user_handle(),
-        "bio": current_user.bio or "",
-        "avatar": getattr(current_user, "avatar", None),
-    }
-
-    return render_template("edit_profile.html", user=user)
+    # pass the actual current_user so templates can read user.avatar, user.name etc
+    return render_template("edit_profile.html", user=current_user)
 
 
 @app.route("/share-profile")
@@ -1422,7 +1426,7 @@ def forgot_password():
             token = generate_reset_token(user.email)
             reset_link = url_for("reset_password", token=token, _external=True)
 
-            # DEV: print link in terminal for now
+            
             print("\n=== PASSWORD RESET LINK ===")
             print(reset_link)
             print("===========================\n")

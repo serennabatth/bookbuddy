@@ -13,7 +13,7 @@
 
 {% block content %}
 <style>
-  /* ---- App bar (match Figma: white strip) ---- */
+  /* ---- App bar  ---- */
   header,
   .appbar,
   .topbar {
@@ -28,7 +28,7 @@
     background: none;
     border: none;
     box-shadow: none;
-    padding: 8px;        /* keeps a nice tap area */
+    padding: 8px;        
     border-radius: 0;
   }
   .navicon:focus,
@@ -49,16 +49,17 @@
 
   /* Avatar */
   .avatar{
-    width:120px;
-    height:120px;
-    border-radius:50%;
-    margin:12px auto 10px;
-    background: var(--card);
-    border: 1px solid var(--border);
-    box-shadow: var(--shadow);
-    background-size: cover;
-    background-position: center;
-  }
+  width:120px;
+  height:120px;
+  border-radius:50%;
+  background:#E5E5E5;             
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  background-size:cover;
+  background-position:center;
+  margin: 12px auto 10px; 
+}
+
 
   /* “Edit Profile Picture” pill button */
   .change-photo{
@@ -195,7 +196,7 @@
         Edit Profile Picture
         <input
           type="file"
-          name="profile_picture"
+          name="avatar"
           id="profilePicInput"
           accept="image/*"
         >

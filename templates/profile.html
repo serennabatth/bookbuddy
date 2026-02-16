@@ -9,7 +9,7 @@
   </a>
 
   <!-- Center: title -->
-  <div class="h1" style="width:100%; text-align:center;">
+  <div class="h1 appbar-title">
     Profile
   </div>
 
@@ -32,13 +32,44 @@
   }
   header { border-bottom: 1px solid rgba(0,0,0,.08); }
 
+/* Proper appbar layout */
+.appbar{
+  display:grid;
+  grid-template-columns: 48px 1fr 48px;
+  align-items:center;
+}
+
+.appbar-title{
+  text-align:center;
+  font-weight:700;
+}
+
+/* Make icon buttons a consistent tap target */
+.navicon{
+  width:48px;
+  height:48px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:0;
+}
+
+/* Prevent SVG distortion */
+.navicon svg{
+  width:22px;
+  height:22px;
+  flex: 0 0 auto;
+  display:block;
+}
+
+
   /* Back/gear icons */
   .navicon{
     background:none;
     border:none;
     box-shadow:none;
-    padding:8px;
-    border-radius:0;
+    padding:10px;
+    border-radius:10px;
     text-decoration:none;
     color:inherit;
     display:flex;
@@ -48,9 +79,10 @@
   .navicon:focus,
   .navicon:active{ outline:none; box-shadow:none; }
 
-  /* Right icon sits on the far right even though title is centered */
+  /* Right icon sits on the far right */
   .navicon.right{
     margin-left:auto;
+    margin-right:8px; 
   }
 
   .p-wrap{
@@ -67,13 +99,13 @@
     margin-top:6px;
   }
 
-  .avatar{
+.avatar{
   width:120px;
   height:120px;
   border-radius:50%;
-  background: var(--card);          
-  border: 1px solid var(--border);  
-  box-shadow: var(--shadow);        
+  background:#E5E5E5;             
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
   background-size:cover;
   background-position:center;
 }
