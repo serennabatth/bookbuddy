@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+
+{% block appbar %}
+  <a class="navicon" href="{{ url_for('profile_page') }}" aria-label="Back">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="15 18 9 12 15 6"></polyline>
+    </svg>
+  </a>
+  <div class="h1">Settings</div>
+{% endblock %}
+
+{% block content %}
+<style>
+  .wrap { max-width: 420px; margin: 0 auto; padding: 8px 16px 112px; }
+
+  .sect-title { font-size: 12px; color: var(--text-2); letter-spacing: .02em; margin: 14px 4px 8px; }
+
+  .list { background: var(--card); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden; }
+  .row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 14px; text-decoration: none; color: inherit;
+    border-bottom: 1px solid var(--border);
+  }
+  .row:last-child { border-bottom: none; }
+
+  .row-left { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1 1 auto; }
+  .row > .switch { margin-left: auto; flex: 0 0 auto; }
+
+  .icon { width: 18px; height: 18px; color: var(--text-2); flex: 0 0 18px; }
+  .label { font-size: 15px; }
+  .sub { font-size: 12px; color: var(--text-2); }
+  .chev { width: 18px; height: 18px; color: var(--text-2); flex: 0 0 18px; }
+
+  .logout {
+    margin-top: 16px; height: 48px; width: 100%;
+    border-radius: 12px; border: 1px solid var(--border); background: var(--card);
+    color: var(--text); font-weight: 600; cursor: pointer; box-shadow: var(--shadow);
+  }
+
+  /* Toggle used by Notifications + Dark Mode */
+  .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider {
+    position: absolute; cursor: pointer; inset: 0;
+    background: var(--muted); border-radius: 999px; transition: .2s;
+    border: 1px solid var(--border);
+  }
+  .slider:before {
+    content:""; position:absolute; left:3px; top:3px;
+    width: 18px; height: 18px; border-radius: 50%; background:#fff; transition:.2s;
+  }
+  input:checked + .slider { background: #111; border-color: #111; }
+  input:checked + .slider:before { transform: translateX(20px); }
+
+  /* Modal */
+  .modal-overlay { position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,.6);
+                   display: none; align-items: center; justify-content: center; }
+  .modal { background: var(--card); color: var(--text); border-radius: 14px; box-shadow: var(--shadow);
+           width: 90%; max-width: 340px; padding: 20px 24px; animation: popIn .2s ease-out; }
+  @keyframes popIn { from{ transform:scale(.9); opacity:0 } to{ transform:scale(1); opacity:1 } }
+  .modal h3 { margin:0 0 8px; font-size:18px; font-weight:700; }
+  .modal p { margin:0 0 16px; font-size:14px; color: var(--text-2); }
+  .modal-buttons { display:flex; gap:8px; }
+  .modal-buttons .cancel, .modal-buttons .confirm {
+    flex:1; height:40px; border-radius:10px; font-weight:600; cursor:pointer;
+  }
+  .modal-buttons .cancel { background: var(--muted); color: var(--text); border:1px solid var(--border); }
+  .modal-buttons .confirm { background:#111; color:#fff; border:none; }
+</style>
+
+<div class="wrap">
+
+  <!-- Account -->
+  <div class="sect-title">ACCOUNT</div>
+  <div class="list">
+    <a class="row" href="{{ url_for('edit_profile') }}">
+      <div class="row-left">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+          <circle cx="12" cy="7" r="4"/></svg>
+        <div>
+          <div class="label">Edit Profile</div>
+          <div class="sub">{{ user.name if user else 'Your info' }}</div>
+        </div>
+      </div>
+      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6"/></svg>
+    </a>
+
+    <a class="row" href="{{ url_for('change_password') }}">
+      <div class="row-left">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+        <div>
+          <div class="label">Change Password</div>
+          <div class="sub">Update your password</div>
+        </div>
+      </div>
+      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6"/></svg>
+    </a>
+  </div>
+
+  <!-- Preferences -->
+  <div class="sect-title">PREFERENCES</div>
+  <div class="list">
+    <!-- Notifications -->
+    <div class="row">
+      <div class="row-left">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M10 21h4"/><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/></svg>
+        <div>
+          <div class="label">Notifications</div>
+          <div class="sub">Enable/disable push notifications</div>
+        </div>
+      </div>
+      <label class="switch" aria-label="Notifications">
+        <input type="checkbox" id="notifToggle">
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <!-- Language -->
+    <a class="row" href="{{ url_for('language_settings') }}">
+      <div class="row-left">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M4.5 10h15"/><path d="M4.5 14h15"/><path d="M9 18h6"/><path d="M10 6h4"/></svg>
+        <div class="label">Language</div>
+      </div>
+      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6"/></svg>
+    </a>
+
+    <!-- Dark Mode -->
+    <div class="row">
+      <div class="row-left">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path>
+        </svg>
+        <div>
+          <div class="label">Dark Mode</div>
+          <div class="sub">Toggle between light and dark theme</div>
+        </div>
+      </div>
+      <label class="switch" aria-label="Dark Mode">
+        <input type="checkbox" id="themeToggle" onchange="toggleTheme()">
+        <span class="slider"></span>
+      </label>
+    </div>
+  </div>
+
+  <!-- Privacy & Help -->
+  <div class="sect-title">PRIVACY & HELP</div>
+  <div class="list">
+    <a class="row" href="{{ url_for('privacy_settings') }}">
+      <div class="row-left">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <div class="label">Privacy</div>
+      </div>
+      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6"/></svg>
+    </a>
+
+    <a class="row" href="mailto:support@bookbuddy.example">
+      <div class="row-left">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M4 4h16v16H4z"/><path d="m22 6-10 7L2 6"/></svg>
+        <div class="label">Help & Support</div>
+      </div>
+      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6"/></svg>
+    </a>
+  </div>
+
+  <!-- Logout -->
+  <button class="logout" type="button" onclick="confirmLogout()">Log out</button>
+
+  <!-- Logout Modal -->
+  <div id="logoutModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="logoutTitle">
+    <div class="modal">
+      <h3 id="logoutTitle">Log out?</h3>
+      <p>Are you sure you want to log out of your account?</p>
+      <div class="modal-buttons">
+        <button class="cancel" type="button" onclick="closeLogoutModal()">Cancel</button>
+        <form id="logoutForm" action="{{ url_for('logout') }}" method="get" style="display:inline;">
+          <button class="confirm" type="submit">Log out</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function confirmLogout(){ document.getElementById('logoutModal').style.display = 'flex'; }
+  function closeLogoutModal(){ document.getElementById('logoutModal').style.display = 'none'; }
+
+  (function(){
+    const nKey = 'bb_notifications';
+    const n = document.getElementById('notifToggle');
+    if(n){
+      const saved = localStorage.getItem(nKey);
+      if(saved !== null) n.checked = (saved === 'on');
+      n.addEventListener('change', () => localStorage.setItem(nKey, n.checked ? 'on' : 'off'));
+    }
+  })();
+</script>
+{% endblock %}

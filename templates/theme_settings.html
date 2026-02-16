@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block appbar %}
+  <a class="navicon" href="{{ url_for('settings') }}" aria-label="Back">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="15 18 9 12 15 6"></polyline>
+    </svg>
+  </a>
+  <div class="h1">Theme</div>
+{% endblock %}
+
+{% block content %}
+<style>
+  .page{ padding:0 16px 24px; }
+  .group{ background:#fff; border-radius:12px; box-shadow:var(--shadow); overflow:hidden; }
+  .row{ display:flex; align-items:center; justify-content:space-between; padding:12px; }
+  .seg{ display:flex; background:#F3F4F6; border-radius:10px; padding:4px; gap:4px; }
+  .seg button{ height:36px; padding:0 12px; border-radius:8px; border:0; cursor:pointer; background:transparent; font-weight:600; }
+  .seg .on{ background:#fff; box-shadow:var(--shadow); }
+</style>
+
+<div class="page">
+  <form class="group" method="post" action="{{ url_for('theme_settings') }}">
+    <input type="hidden" id="themeInput" name="theme" value="{{ theme }}">
+    <div class="row">
+      <div style="font-weight:600;">Appearance</div>
+      <div class="seg">
+        <button type="button" class="{% if theme=='light' %}on{% endif %}" onclick="pick('light')">Light</button>
+        <button type="button" class="{% if theme=='dark' %}on{% endif %}" onclick="pick('dark')">Dark</button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<script>
+  function pick(val){
+    document.getElementById('themeInput').value = val;
+    document.forms[0].submit();
+  }
+</script>
+{% endblock %}

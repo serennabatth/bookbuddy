@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+
+{% block appbar %}
+  <a class="navicon" href="{{ url_for('add_review') }}" aria-label="Back">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="15 18 9 12 15 6"></polyline>
+    </svg>
+  </a>
+  <div class="h1">Add New Book</div>
+{% endblock %}
+
+{% block content %}
+<style>
+  .page { padding:0 16px 32px; }
+
+  form { display:flex; flex-direction:column; gap:16px; }
+
+  .field { display:flex; flex-direction:column; gap:6px; }
+  .label { font-size:12px; color:#6B7280; }
+
+  .input {
+    height:48px;
+    border:none;
+    border-radius:12px;
+    background:#F3F3F3;
+    padding:0 12px;
+    font-size:14px;
+    color:#111;
+    font-family: inherit;
+  }
+  .input:focus { outline:2px solid #111; }
+
+  select.input {
+    appearance:none;
+    background:#F3F3F3 url('data:image/svg+xml;utf8,<svg fill="none" stroke="black" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><polyline points="6 9 12 15 18 9"/></svg>')
+      no-repeat right 12px center/16px;
+  }
+
+  .button.primary {
+    background:#111;
+    color:#fff;
+    font-weight:600;
+    height:48px;
+    border:none;
+    border-radius:12px;
+    cursor:pointer;
+  }
+  .button.primary:active { opacity:0.9; }
+
+  /* Open Library search area */
+  .searchwrap{
+    background:#fff;
+    border:1px solid #E5E7EB;
+    border-radius:12px;
+    padding:12px;
+    box-shadow:0 1px 3px rgba(0,0,0,.08);
+    margin-bottom:8px;
+  }
+
+  .results{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    margin-top:10px;
+  }
+
+  .result{
+    display:flex;
+    gap:10px;
+    align-items:center;
+    padding:10px;
+    border:1px solid #E5E7EB;
+    border-radius:12px;
+    background:#fff;
+    cursor:pointer;
+  }
+  .result:active{ background:#f7f7f7; }
+
+  .thumb{
+    width:44px;height:60px;
+    border-radius:10px;
+    background:#F3F3F3;
+    object-fit:cover;
+    flex:0 0 auto;
+  }
+
+  .rmeta{ flex:1; min-width:0; }
+  .rtitle{
+    font-size:14px;
+    color:#111;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .rauthor{
+    font-size:12px;
+    color:#6B7280;
+    margin-top:4px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+
+  .pill{
+    font-size:12px;
+    color:#6B7280;
+    padding:4px 8px;
+    border:1px solid #E5E7EB;
+    border-radius:999px;
+    background:#fff;
+    flex:0 0 auto;
+  }
+
+  .muted{
+    font-size:12px;
+    color:#6B7280;
+    margin-top:8px;
+  }
+</style>
+
+<div class="page">
+
+  <!-- Open Library Search -->
+  <div class="searchwrap">
+    <div class="field" style="gap:8px;">
+      <label class="label">Search Open Library</label>
+      <input id="ol_q" class="input" type="text" placeholder="Type a book title or author…">
+      <div class="muted">Tap a result to auto-fill the form below.</div>
+    </div>
+
+    <div id="ol_results" class="results" aria-live="polite"></div>
+  </div>
+
+  <!-- Manual/Add form -->
+  <form id="bookForm" action="{{ url_for('add_book') }}" method="post">
+    <div class="field">
+      <label class="label">Title</label>
+      <input id="title" class="input" type="text" name="title" placeholder="e.g. The Handmaid’s Tale" required>
+    </div>
+
+    <div class="field">
+      <label class="label">Author</label>
+      <input id="author" class="input" type="text" name="author" placeholder="e.g. Margaret Atwood" required>
+    </div>
+
+    <div class="field">
+      <label class="label">Genre</label>
+      <select id="genre" class="input" name="genre" required>
+        {% for g in genres %}
+          <option value="{{ g }}">{{ g }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="field">
+      <label class="label">Year</label>
+      <input id="year" class="input" type="number" name="year" placeholder="e.g. 1985">
+    </div>
+
+    <div class="field">
+      <label class="label">Cover Image URL</label>
+      <input id="cover" class="input" type="url" name="cover" placeholder="Paste image link here">
+    </div>
+
+    <button class="button primary" type="submit">Add Book</button>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+  const q = document.getElementById('ol_q');
+  const results = document.getElementById('ol_results');
+
+  const title = document.getElementById('title');
+  const author = document.getElementById('author');
+  const year = document.getElementById('year');
+  const cover = document.getElementById('cover');
+
+  let timer = null;
+
+  function escapeHtml(s){
+    return (s || '').replace(/[&<>"']/g, m => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[m]));
+  }
+
+  function render(items){
+    results.innerHTML = '';
+    if (!items || items.length === 0){
+      if (q.value.trim().length >= 2){
+        results.innerHTML = '<div class="muted">No results found. Try a different search.</div>';
+      }
+      return;
+    }
+
+    results.innerHTML = items.map((b, i) => {
+      const img = b.cover ? `<img class="thumb" src="${escapeHtml(b.cover)}" alt="">`
+                          : `<div class="thumb" aria-hidden="true"></div>`;
+      const yr = b.year ? `<span class="pill">${escapeHtml(b.year)}</span>` : '';
+      return `
+        <div class="result" data-i="${i}">
+          ${img}
+          <div class="rmeta">
+            <div class="rtitle">${escapeHtml(b.title)}</div>
+            <div class="rauthor">${escapeHtml(b.author)}</div>
+          </div>
+          ${yr}
+        </div>
+      `;
+    }).join('');
+
+    // click handlers
+    Array.from(results.querySelectorAll('.result')).forEach(el => {
+      el.addEventListener('click', () => {
+        const idx = parseInt(el.getAttribute('data-i'), 10);
+        const b = items[idx];
+
+        title.value = b.title || '';
+        author.value = b.author || '';
+        year.value = b.year || '';
+        cover.value = b.cover || '';
+
+        // scroll to form start
+        title.scrollIntoView({behavior:'smooth', block:'center'});
+      });
+    });
+  }
+
+  async function search(){
+    const term = q.value.trim();
+    if (term.length < 2){
+      results.innerHTML = '';
+      return;
+    }
+
+    try{
+      const res = await fetch(`/api/openlibrary?q=${encodeURIComponent(term)}`);
+      const data = await res.json();
+      render(data);
+    }catch(e){
+      results.innerHTML = '<div class="muted">Search unavailable right now.</div>';
+    }
+  }
+
+  q.addEventListener('input', () => {
+    clearTimeout(timer);
+    timer = setTimeout(search, 250);
+  });
+})();
+</script>
+{% endblock %}

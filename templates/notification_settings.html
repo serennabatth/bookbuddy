@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block appbar %}
+  <a class="navicon" href="{{ url_for('settings') }}" aria-label="Back">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="15 18 9 12 15 6"></polyline>
+    </svg>
+  </a>
+  <div class="h1">Notifications</div>
+{% endblock %}
+
+{% block content %}
+<style>
+  .page{ padding:0 16px 24px; }
+  .group{ background:#fff; border-radius:12px; box-shadow:var(--shadow); overflow:hidden; }
+  .row{ display:flex; align-items:center; justify-content:space-between; padding:12px; }
+  .desc{ font-size:12px; color:#6B7280; }
+  .toggle{ width:46px; height:28px; background:#E5E7EB; border-radius:999px; position:relative; cursor:pointer; }
+  .toggle input{ display:none; }
+  .knob{ position:absolute; top:3px; left:3px; width:22px; height:22px; background:#fff; border-radius:50%; transition:.15s; box-shadow:var(--shadow); }
+  .toggle input:checked + .knob{ left:21px; background:#111; }
+</style>
+
+<div class="page">
+  <form class="group" method="post" action="{{ url_for('notifications_settings') }}">
+    <div class="row">
+      <div>
+        <div style="font-weight:600;">Push notifications</div>
+        <div class="desc">Get alerts for follows, likes and replies.</div>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" name="enabled" {% if enabled %}checked{% endif %} onchange="this.form.submit()">
+        <span class="knob"></span>
+      </label>
+    </div>
+  </form>
+</div>
+{% endblock %}

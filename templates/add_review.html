@@ -1,0 +1,332 @@
+{% extends "base.html" %}
+
+{% block appbar %}
+  <a class="navicon" href="{{ url_for('home') }}" aria-label="Back">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="15 18 9 12 15 6"></polyline>
+    </svg>
+  </a>
+  <div class="h1">Add Review</div>
+{% endblock %}
+
+{% block content %}
+<style>
+  .page { padding: 0 16px 24px; }
+
+  /* search */
+  .search {
+    display:flex; align-items:center; gap:10px;
+    background:#fff; border-radius:12px; padding:10px 12px;
+    box-shadow:var(--shadow); position:relative;
+  }
+  .search .icon { width:18px; height:18px; color:#9CA3AF; flex:0 0 18px; }
+  .search input { border:0; outline:0; background:transparent; width:100%; font-size:14px; }
+
+  /* dropdown */
+  .dropdown {
+    position:absolute; left:0; right:0; top:100%; margin-top:6px;
+    background:#fff; border-radius:12px; box-shadow:var(--shadow);
+    overflow:hidden; display:none; max-height:320px; overflow-y:auto; z-index:5;
+  }
+  .dropdown.open { display:block; }
+  .dd-row { display:flex; align-items:center; gap:12px; padding:10px 12px; text-decoration:none; color:inherit; cursor:pointer; }
+  .dd-row + .dd-row { border-top:1px solid #EFEFEF; }
+  .dd-row:focus { outline:none; background:#F3F4F6; }
+  .dd-thumb { width:40px; height:54px; border-radius:8px; overflow:hidden; background:#F3F4F6; flex:0 0 40px; }
+  .dd-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+  .dd-meta { min-width:0; flex:1 1 auto; }
+  .dd-title { font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .dd-sub { font-size:12px; color:#6B7280; }
+
+  /* “Add New Book” row */
+  .add-row { display:flex; gap:12px; align-items:center; padding:10px 12px; cursor:pointer; text-decoration:none; color:inherit; }
+  .add-icon { width:40px; height:54px; border-radius:8px; background:#F3F4F6; display:flex; align-items:center; justify-content:center; }
+  .plus { width:18px; height:18px; }
+
+  /* empty state */
+  .dd-empty { padding:12px; font-size:13px; color:#6B7280; }
+
+  /* selected book strip */
+  .selected { margin-top:12px; background:#fff; border-radius:12px; box-shadow:var(--shadow); overflow:hidden; display:none; }
+  .selected.show { display:block; }
+  .sel-row { display:flex; gap:12px; align-items:center; padding:12px; }
+  .sel-thumb { width:48px; height:64px; border-radius:8px; overflow:hidden; background:#F3F4F6; flex:0 0 48px; }
+  .sel-thumb img { width:100%; height:100%; object-fit:cover; }
+  .sel-meta .t { font-size:14px; font-weight:600; line-height:1.25; }
+  .sel-meta .s { font-size:12px; color:#6B7280; }
+  .sel-clear { margin-left:auto; color:#9CA3AF; border:none; background:transparent; cursor:pointer; }
+
+  /* composer card */
+  .composer { margin-top:12px; background:#fff; border-radius:12px; box-shadow:var(--shadow); padding:12px; }
+  .composer textarea{
+    width:100%; min-height:160px; resize:vertical; border:0; outline:0; background:#F9FAFB;
+    border-radius:10px; padding:12px; font-size:14px;
+  }
+
+  /* stars row */
+  .stars { display:flex; gap:16px; align-items:center; background:#fff; border-radius:12px; box-shadow:var(--shadow); padding:12px; margin-top:12px; }
+  .star { width:28px; height:28px; color:#D1D5DB; cursor:pointer; transition:color .15s ease-in-out; }
+  .star.active { color:#111; }
+
+  .hint { margin-top:8px; font-size:12px; color:#6B7280; }
+
+  /* actions */
+  .actions { display:flex; gap:12px; margin-top:16px; }
+  .button { display:inline-flex; align-items:center; justify-content:center; height:44px; padding:0 16px; border-radius:12px; border:none; cursor:pointer; font-weight:600; }
+  .button.primary { background:#111; color:#fff; }
+  .button.secondary { background:#fff; color:#111; box-shadow:var(--shadow); }
+</style>
+
+<div class="page">
+
+  <!-- search with dropdown -->
+  <div class="search">
+    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+    </svg>
+    <input id="searchInput" type="text" placeholder="Search for a book" autocomplete="off" aria-label="Search for a book">
+    <div id="dropdown" class="dropdown" role="listbox" aria-label="Book results">
+      <a class="add-row" href="{{ url_for('add_book') }}">
+        <div class="add-icon">
+          <svg class="plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+        </div>
+        <div class="dd-meta">
+          <div class="dd-title">Add New Book</div>
+          <div class="dd-sub">Not found? Click to add it.</div>
+        </div>
+      </a>
+      <div id="ddList"></div>
+      <div id="ddEmpty" class="dd-empty" style="display:none;">No matches. Try another title/author.</div>
+    </div>
+  </div>
+
+  <!-- selected book summary -->
+  <div id="selected" class="selected" aria-live="polite">
+    <div class="sel-row">
+      <div class="sel-thumb"><img id="selCover" alt=""></div>
+      <div class="sel-meta">
+        <div class="t" id="selTitle"></div>
+        <div class="s" id="selAuthor"></div>
+      </div>
+      <button class="sel-clear" id="clearSel" title="Clear" type="button">✕</button>
+    </div>
+  </div>
+
+  <!-- composer -->
+  <div class="composer">
+    <textarea id="reviewText" placeholder="Write your review..." required></textarea>
+  </div>
+
+  <!-- stars -->
+  <div class="stars" id="starRow" role="radiogroup" aria-label="Rating">
+    {% for i in range(1,6) %}
+      <svg class="star" data-val="{{ i }}" viewBox="0 0 24 24" fill="currentColor" aria-label="{{ i }} star" tabindex="0">
+        <path d="M12 17.27l5.18 3.09-1.64-5.81L20.5 9.5l-6-.26L12 4 9.5 9.24l-6 .26 4.96 4.05-1.64 5.81L12 17.27z"/>
+      </svg>
+    {% endfor %}
+  </div>
+
+
+  <!-- actions -->
+  <div class="actions">
+    <button class="button primary" id="submitBtn" type="button">Submit Review</button>
+    <button class="button secondary" id="clearBtn" type="button">Clear Review</button>
+  </div>
+
+  <!-- hidden real post form -->
+  <form id="postForm" action="{{ url_for('add_review') }}" method="post" style="display:none;">
+    <input type="hidden" name="book_title" id="bookTitle">
+    <input type="hidden" name="review" id="reviewField">
+    <input type="hidden" name="rating" id="ratingField" value="0">
+  </form>
+</div>
+
+<script id="book-data" type="application/json">{{ books|tojson|safe }}</script>
+
+<script>
+  const BOOKS = JSON.parse(document.getElementById('book-data').textContent) || [];
+  const PLACEHOLDER = "https://placehold.co/400x600/EEE/AAA?text=No+Cover";
+
+  // Elements
+  const input = document.getElementById('searchInput');
+  const dd = document.getElementById('dropdown');
+  const ddList = document.getElementById('ddList');
+  const ddEmpty = document.getElementById('ddEmpty');
+
+  const selected = document.getElementById('selected');
+  const selTitle = document.getElementById('selTitle');
+  const selAuthor = document.getElementById('selAuthor');
+  const selCover = document.getElementById('selCover');
+  const clearSel = document.getElementById('clearSel');
+
+  const reviewText = document.getElementById('reviewText');
+  const submitBtn = document.getElementById('submitBtn');
+  const clearBtn = document.getElementById('clearBtn');
+
+  const bookTitleField = document.getElementById('bookTitle');
+  const reviewField = document.getElementById('reviewField');
+  const ratingField = document.getElementById('ratingField');
+
+  // Stars
+  const stars = Array.from(document.querySelectorAll('.star'));
+  let rating = 0;
+
+  function paintStars() {
+    stars.forEach((s, i) => s.classList.toggle('active', i < rating));
+  }
+
+  stars.forEach((s, i) => {
+    s.addEventListener('click', () => {
+      rating = i + 1;
+      paintStars();
+    });
+    s.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        rating = i + 1;
+        paintStars();
+      }
+    });
+  });
+
+  // Dropdown rendering
+  let lastResults = [];
+
+  function openDropdown() {
+    dd.classList.add('open');
+  }
+
+  function closeDropdown() {
+    dd.classList.remove('open');
+  }
+
+  function renderList(q) {
+    ddList.innerHTML = '';
+    const term = (q || '').trim().toLowerCase();
+
+    // show results even when empty query (browse mode)
+    const results = BOOKS
+      .filter(b => {
+        const t = (b.title || '').toLowerCase();
+        const a = (b.author || '').toLowerCase();
+        return !term || t.includes(term) || a.includes(term);
+      })
+      .slice(0, 25);
+
+    lastResults = results;
+
+    ddEmpty.style.display = results.length ? 'none' : 'block';
+
+    results.forEach((b) => {
+      const row = document.createElement('div');
+      row.className = 'dd-row';
+      row.tabIndex = 0;
+
+      const cover = (b.cover || '').trim() || PLACEHOLDER;
+
+      row.innerHTML = `
+        <div class="dd-thumb"><img src="${cover}" alt="" onerror="this.src='${PLACEHOLDER}'"></div>
+        <div class="dd-meta">
+          <div class="dd-title">${escapeHtml(b.title || '')}</div>
+          <div class="dd-sub">${escapeHtml(b.author || '')}</div>
+        </div>
+      `;
+
+      row.addEventListener('click', () => selectBook(b));
+      row.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') selectBook(b);
+      });
+
+      ddList.appendChild(row);
+    });
+
+    openDropdown();
+  }
+
+  function selectBook(b) {
+    selTitle.textContent = b.title || '';
+    selAuthor.textContent = b.author || '';
+    selCover.src = (b.cover || '').trim() || PLACEHOLDER;
+
+    selected.classList.add('show');
+    bookTitleField.value = b.title || '';
+
+    closeDropdown();
+    input.value = '';
+    input.blur();
+  }
+
+  clearSel.addEventListener('click', () => {
+    selected.classList.remove('show');
+    bookTitleField.value = '';
+    input.focus();
+    renderList('');
+  });
+
+  // Open dropdown on focus/click (even with empty input)
+  input.addEventListener('focus', () => renderList(input.value));
+  input.addEventListener('click', () => renderList(input.value));
+  input.addEventListener('input', (e) => renderList(e.target.value));
+
+  // Keyboard helpers for search input
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeDropdown();
+      return;
+    }
+    if (e.key === 'Enter') {
+      // If user presses Enter, select the first result (if exists)
+      if (dd.classList.contains('open') && lastResults.length) {
+        e.preventDefault();
+        selectBook(lastResults[0]);
+      }
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!dd.contains(e.target) && e.target !== input) closeDropdown();
+  });
+
+  // Actions
+  clearBtn.addEventListener('click', () => {
+    reviewText.value = '';
+    rating = 0;
+    paintStars();
+  });
+
+  submitBtn.addEventListener('click', () => {
+    if (!bookTitleField.value) {
+      input.focus();
+      renderList(input.value);
+      return;
+    }
+
+    const text = (reviewText.value || '').trim();
+    if (!text) {
+      reviewText.focus();
+      return;
+    }
+
+    // require a rating (feels more “real”)
+    if (!rating) {
+      document.getElementById('starRow').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+
+    reviewField.value = text;
+    ratingField.value = rating;
+    document.getElementById('postForm').submit();
+  });
+
+  function escapeHtml(s) {
+    return String(s || '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+  }
+</script>
+{% endblock %}

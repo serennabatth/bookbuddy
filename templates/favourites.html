@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block appbar %}
+  <a class="navicon" href="{{ url_for('home') }}" aria-label="Back">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="15 18 9 12 15 6"></polyline>
+    </svg>
+  </a>
+  <div class="h1">Favourites</div>
+{% endblock %}
+
+{% block content %}
+<style>
+  .wrap { padding: 0 16px 24px; }
+
+  /* Search */
+  .search{
+    display:flex; align-items:center; gap:10px;
+    background:var(--card);
+    border-radius:12px;
+    padding:10px 12px;
+    box-shadow:var(--shadow);
+    border:1px solid var(--border);
+  }
+  .search .icon{ width:18px; height:18px; color:var(--text-2); flex:0 0 18px; }
+  .search input{
+    border:0; outline:0; width:100%;
+    font-size:14px; background:transparent; color:var(--text);
+  }
+
+  .meta-row{
+    display:flex; justify-content:space-between; align-items:center;
+    margin:10px 0;
+    font-size:12px; color:var(--text-2);
+  }
+
+  /* Grid */
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(2, 1fr);
+    gap:16px;
+  }
+  .card{
+    text-decoration:none; color:inherit;
+    background:var(--card);
+    border-radius:12px;
+    overflow:hidden;
+    box-shadow:var(--shadow);
+    border:1px solid var(--border);
+    display:block;
+  }
+  .card img{
+    width:100%;
+    height:180px;
+    object-fit:cover;
+    display:block;
+    background:var(--muted);
+  }
+  .meta{ padding:8px; }
+  .meta .rating{ font-size:12px; color:var(--text-2); margin-bottom:4px; }
+  .meta .title{
+    font-size:14px; font-weight:600; line-height:1.25;
+    overflow:hidden;
+    display:-webkit-box;
+    -webkit-box-orient:vertical;
+    -webkit-line-clamp:2;
+    line-clamp:2;
+  }
+  .meta .author{ font-size:12px; color:var(--text-2); }
+
+  /* Empty state */
+  .empty{
+    margin-top:16px;
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:16px;
+    box-shadow:var(--shadow);
+    padding:18px;
+    text-align:center;
+    color:var(--text-2);
+  }
+  .empty .t{
+    font-weight:700;
+    color:var(--text);
+    margin-bottom:6px;
+  }
+</style>
+
+<div class="wrap">
+
+  <!-- search -->
+  <form class="search" action="{{ url_for('favourites') }}" method="get">
+    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="11" cy="11" r="7"></circle>
+      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+    </svg>
+    <input name="q" value="{{ q or '' }}" placeholder="Search favourites">
+  </form>
+
+  {% set ql = (q or '') | lower %}
+  {% set filtered = [] %}
+  {% for b in books %}
+    {% if not ql or ql in b.title|lower or ql in b.author|lower %}
+      {% set _ = filtered.append(b) %}
+    {% endif %}
+  {% endfor %}
+
+  <div class="meta-row">
+    <div>{{ filtered|length }} saved</div>
+    {% if q %}
+      <div>Searching: “{{ q }}”</div>
+    {% endif %}
+  </div>
+
+  {% if filtered and filtered|length %}
+    <div class="grid">
+      {% for b in filtered %}
+        <a class="card" href="{{ url_for('book_details', title=b.title) }}">
+          <img
+          src="{{ b.cover }}"
+          alt="{{ b.title }}"
+          onerror="this.onerror=null;this.src='https://placehold.co/400x600/EEE/AAA?text=No+Cover';"
+          >
+
+
+
+          <div class="meta">
+            <div class="rating">{{ '%.2f'|format(b.get('rating', 0)) }} avg rating</div>
+            <div class="title clamp-2">{{ b.title }}</div>
+            <div class="author clamp-1">{{ b.author }}</div>
+
+          </div>
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty">
+      <div class="t">No favourites yet</div>
+      <div>Tap the ♥ on any book to save it here.</div>
+      <div style="margin-top:12px;">
+        <a class="button" href="{{ url_for('browse') }}" style="height:40px;">Browse books</a>
+      </div>
+    </div>
+  {% endif %}
+
+</div>
+{% endblock %}

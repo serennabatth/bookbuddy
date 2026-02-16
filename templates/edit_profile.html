@@ -1,0 +1,266 @@
+{% extends "base.html" %}
+
+{% block appbar %}
+  <a class="navicon" href="{{ url_for('profile_page') }}" aria-label="Back">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="15 18 9 12 15 6"></polyline>
+    </svg>
+  </a>
+  <div class="h1" style="width:100%; text-align:center; margin-right:36px;">
+    Edit Profile
+  </div>
+{% endblock %}
+
+{% block content %}
+<style>
+  /* ---- App bar (match Figma: white strip) ---- */
+  header,
+  .appbar,
+  .topbar {
+    background: #fff !important;
+  }
+  header {
+    border-bottom: 1px solid rgba(0,0,0,.08);
+  }
+
+  /* Back arrow – remove square button styling */
+  .navicon {
+    background: none;
+    border: none;
+    box-shadow: none;
+    padding: 8px;        /* keeps a nice tap area */
+    border-radius: 0;
+  }
+  .navicon:focus,
+  .navicon:active {
+    outline: none;
+    box-shadow: none;
+  }
+
+  /* Page wrap */
+  .edit-wrap{
+    max-width:420px;
+    margin:0 auto;
+    padding:16px;
+    min-height: calc(100vh - 120px);
+    /* 120px ≈ header + bottom tab bar */
+    display: flex;
+  }
+
+  /* Avatar */
+  .avatar{
+    width:120px;
+    height:120px;
+    border-radius:50%;
+    margin:12px auto 10px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    background-size: cover;
+    background-position: center;
+  }
+
+  /* “Edit Profile Picture” pill button */
+  .change-photo{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    padding:10px 16px;
+    border-radius:14px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    font-weight:500;
+    cursor:pointer;
+    user-select:none;
+    font-family:inherit;
+    font-size:16px;
+  }
+  input[type="file"]{ display:none; }
+
+  /* Form layout */
+  form{
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+    width:100%;
+    height:100%; /* helps spacer behaviour */
+  }
+
+  .field{ display:flex; flex-direction:column; gap:8px; }
+
+  .label{
+    font-size:16px;
+    font-weight:700;
+    color: var(--text);
+    margin-left:2px;
+  }
+
+  .input, .textarea{
+    width:100%;
+    border-radius:16px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    box-shadow: var(--shadow);
+    font-size:16px;
+    padding:12px 16px;
+    font-family:inherit;
+    color: var(--text);
+  }
+  .input{ height:50px; }
+
+  .textarea{
+    min-height:72px;
+    resize:none;
+  }
+
+  .input:focus, .textarea:focus{
+    outline: 2px solid rgba(0,0,0,.14);
+    outline-offset: 2px;
+  }
+
+  .settings-link{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:14px 16px;
+    border-radius:16px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    box-shadow: var(--shadow);
+    text-decoration:none;
+    color: var(--text);
+    font-size:16px;
+    font-weight:400;
+  }
+  .chev{
+    font-size:20px;
+    color: var(--text);
+    line-height:1;
+  }
+
+  /* ✅ Controlled spacer so the gap never becomes massive */
+  .form-spacer{
+    flex: 1;
+    max-height: 48px; /* tweak: 36px tighter, 56px looser */
+  }
+
+  /* Bottom action buttons */
+  .actions{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:14px;
+    padding-top: 12px;
+  }
+
+  .btn-dark{
+    height:50px;
+    border-radius:14px;
+    background:#111;
+    color:#fff;
+    border:none;
+    box-shadow: var(--shadow);
+    font-family:inherit;
+    font-size:16px;
+    font-weight:700;
+  }
+  .btn-dark:active{ filter: brightness(.96); }
+</style>
+
+<div class="edit-wrap">
+
+  <form
+    method="POST"
+    action="{{ url_for('edit_profile') }}"
+    enctype="multipart/form-data"
+  >
+    <!-- Avatar -->
+    {% if user.avatar %}
+      <div
+        id="avatarPreview"
+        class="avatar"
+        aria-hidden="true"
+        style="background-image: url('{{ url_for('static', filename=user.avatar) }}');"
+      ></div>
+    {% else %}
+      <div
+        id="avatarPreview"
+        class="avatar"
+        aria-hidden="true"
+      ></div>
+    {% endif %}
+
+    <div style="display:flex; justify-content:center;">
+      <label class="change-photo">
+        Edit Profile Picture
+        <input
+          type="file"
+          name="profile_picture"
+          id="profilePicInput"
+          accept="image/*"
+        >
+      </label>
+    </div>
+
+    <!-- Fields -->
+    <div class="field">
+      <label class="label">Name</label>
+      <input name="name" class="input" value="{{ user.name }}" required>
+    </div>
+
+    <div class="field">
+      <label class="label">Username</label>
+      <input
+        name="handle"
+        class="input"
+        value="{{ user.handle|replace('@','') }}"
+        required
+      >
+    </div>
+
+    <div class="field">
+      <label class="label">Bio</label>
+      <textarea
+        name="bio"
+        class="textarea"
+        maxlength="200"
+        placeholder="Tell people a little about you…"
+      >{{ user.bio }}</textarea>
+    </div>
+
+    <a class="settings-link" href="{{ url_for('settings') }}">
+      Settings
+      <span class="chev">›</span>
+    </a>
+
+    <!-- ✅ Spacer added here -->
+    <div class="form-spacer"></div>
+
+    <div class="actions">
+      <a class="btn-dark" href="{{ url_for('profile_page') }}"
+         style="text-decoration:none; display:flex; align-items:center; justify-content:center;">
+        Cancel Changes
+      </a>
+      <button class="btn-dark" type="submit">
+        Save Changes
+      </button>
+    </div>
+  </form>
+</div>
+
+<script>
+  const input = document.getElementById("profilePicInput");
+  const preview = document.getElementById("avatarPreview");
+
+  input.addEventListener("change", () => {
+    const file = input.files && input.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      preview.style.backgroundImage = `url('${e.target.result}')`;
+    };
+    reader.readAsDataURL(file);
+  });
+</script>
+{% endblock %}

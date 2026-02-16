@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block appbar %}
+  <a class="navicon" href="{{ url_for('profile_page') }}">
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none"
+         stroke="currentColor" stroke-width="2">
+      <polyline points="15 18 9 12 15 6"></polyline>
+    </svg>
+  </a>
+  <div class="h1" style="flex:1;text-align:center;margin-right:36px;">
+    My Reviews
+  </div>
+{% endblock %}
+
+{% block content %}
+<style>
+  .mr-wrap{
+    max-width:420px;
+    margin:0 auto;
+    padding:16px;
+  }
+
+  .list{
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+  }
+
+  .row{
+    display:flex;
+    gap:12px;
+    padding:12px;
+    border-radius:16px;
+    text-decoration:none;
+  }
+
+  .thumb{
+    width:54px;
+    height:72px;
+    border-radius:10px;
+    background:#F3F3F3;
+    overflow:hidden;
+    flex:0 0 54px;
+  }
+  .thumb img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    display:block;
+  }
+
+  .meta{
+    flex:1;
+    min-width:0;
+  }
+
+  .title{
+    font-size:14px;
+    line-height:1.25;
+    color:var(--text);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
+  .author{
+    font-size:12px;
+    color:var(--text-2);
+    margin-top:4px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
+  .info{
+    font-size:12px;
+    color:var(--text-2);
+    margin-top:6px;
+  }
+
+  .review{
+    font-size:13px;
+    color:var(--text-2);
+    margin-top:8px;
+    line-height:1.35;
+  }
+
+  .empty{
+    font-size:14px;
+    color:var(--text-2);
+  }
+</style>
+
+<div class="mr-wrap">
+
+  {% if reviews and reviews|length %}
+    <div class="list">
+      {% for r in reviews %}
+        <a href="{{ url_for('book_details', title=r.book_title) }}"
+           class="card row">
+
+          <div class="thumb">
+            <img
+            src="{{ r.book_cover }}"
+            alt="{{ r.book_title }}"
+            onerror="this.onerror=null;this.src='https://placehold.co/400x600/EEE/AAA?text=No+Cover';"
+             >
+
+          </div>
+
+          <div class="meta">
+            <div class="title clamp-2">{{ r.book_title }}</div>
+            <div class="author clamp-1">{{ r.book_author }}</div>
+            <div class="info">
+              {{ r.rating }}/5 • {{ r.created.strftime("%d %b %Y") }}
+            </div>
+
+            {% if r.text %}
+              <div class="review">{{ r.text }}</div>
+            {% endif %}
+          </div>
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="title">No reviews yet</div>
+    Start by adding a review from any book page.
+  </div>
+{% endif %}
+
+
+</div>
+{% endblock %}

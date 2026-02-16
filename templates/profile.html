@@ -1,0 +1,357 @@
+{% extends "base.html" %}
+
+{% block appbar %}
+  <!-- Left: back -->
+  <a class="navicon" href="javascript:history.back()" aria-label="Back">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="15 18 9 12 15 6"></polyline>
+    </svg>
+  </a>
+
+  <!-- Center: title -->
+  <div class="h1" style="width:100%; text-align:center;">
+    Profile
+  </div>
+
+  <!-- Right: settings gear -->
+  <a class="navicon right" href="{{ url_for('settings') }}" aria-label="Settings">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="3"></circle>
+      <path d="M19.4 15a7.8 7.8 0 0 0 .1-2l2-1.5-2-3.5-2.4 1a7.7 7.7 0 0 0-1.7-1l-.3-2.6H10l-.3 2.6a7.7 7.7 0 0 0-1.7 1l-2.4-1-2 3.5 2 1.5a7.8 7.8 0 0 0 .1 2l-2 1.5 2 3.5 2.4-1c.5.4 1.1.7 1.7 1l.3 2.6h4l.3-2.6c.6-.2 1.2-.6 1.7-1l2.4 1 2-3.5-2-1.5z"></path>
+    </svg>
+  </a>
+{% endblock %}
+
+{% block content %}
+<style>
+  /* Header bar white like Figma */
+  header,
+  .appbar,
+  .topbar {
+    background: #fff !important;
+  }
+  header { border-bottom: 1px solid rgba(0,0,0,.08); }
+
+  /* Back/gear icons: no box */
+  .navicon{
+    background:none;
+    border:none;
+    box-shadow:none;
+    padding:8px;
+    border-radius:0;
+    text-decoration:none;
+    color:inherit;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .navicon:focus,
+  .navicon:active{ outline:none; box-shadow:none; }
+
+  /* Right icon sits on the far right even though title is centered */
+  .navicon.right{
+    margin-left:auto;
+  }
+
+  .p-wrap{
+    max-width:420px;
+    margin:0 auto;
+    padding:16px;
+  }
+
+  /* Top section: avatar left, info right (Figma) */
+  .profile-top{
+    display:flex;
+    gap:18px;
+    align-items:center;
+    margin-top:6px;
+  }
+
+  .avatar{
+  width:120px;
+  height:120px;
+  border-radius:50%;
+  background: var(--card);          /* same colour as edit profile */
+  border: 1px solid var(--border);  /* subtle outline */
+  box-shadow: var(--shadow);        /* same elevation */
+  background-size:cover;
+  background-position:center;
+}
+
+
+  .info{
+    flex:1;
+    min-width:0;
+  }
+
+  .name{
+    font-size:20px;
+    font-weight:700;
+    color:var(--text);
+    line-height:1.2;
+  }
+
+  .handle{
+    font-size:14px;
+    color:var(--text-2);
+    margin-top:6px;
+  }
+
+  .bio{
+    font-size:14px;
+    color:var(--text);
+    margin-top:10px;
+    line-height:1.45;
+  }
+  .bio.placeholder{ color:var(--text-2); }
+
+  /* Stats: 3 cards like Figma */
+  .stats{
+    display:grid;
+    grid-template-columns:repeat(3, 1fr);
+    gap:12px;
+    margin-top:18px;
+  }
+  .stat-card{
+    background: var(--card);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    border-radius:14px;
+    padding:10px 8px;
+    text-align:center;
+  }
+  .stat-num{
+    font-size:18px;
+    font-weight:700;
+    color:var(--text);
+    line-height:1.1;
+  }
+  .stat-label{
+    font-size:12px;
+    color:var(--text-2);
+    margin-top:4px;
+  }
+  .stat-link{
+  text-decoration:none;
+  color:inherit;
+  display:block;
+  cursor:pointer;
+}
+.stat-link:active{
+  filter: brightness(.98);
+}
+
+
+  /* Action buttons: white pills like Figma */
+  .actions{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:14px;
+    margin-top:14px;
+  }
+  .action-btn{
+    height:46px;
+    border-radius:14px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    text-decoration:none;
+    color: var(--text);
+    font-family:inherit;
+    font-size:16px;
+    font-weight:600;
+  }
+  .action-btn:active{ filter: brightness(.97); }
+
+  /* Reviews header + see all */
+  .reviews-wrap{
+    margin-top:22px;
+  }
+  .reviews-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:12px;
+  }
+  .reviews-title{
+    font-size:18px;
+    font-weight:700;
+    color:var(--text);
+  }
+  .seeall{
+    font-size:13px;
+    color:var(--text-2);
+    text-decoration:none;
+  }
+
+  /* Review cards: match Figma (cover, then text) */
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(2, 1fr);
+    gap:14px;
+  }
+
+  .review-card{
+    display:block;
+    text-decoration:none;
+    color:inherit;
+  }
+
+  .thumb{
+    width:100%;
+    aspect-ratio: 1 / 1; /* matches your Figma “square-ish” covers */
+    border-radius:16px;
+    overflow:hidden;
+    background: var(--muted);
+    box-shadow: var(--shadow);
+  }
+  .thumb img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    display:block;
+  }
+
+  .meta{
+    padding:10px 2px 0;
+  }
+
+  .avg{
+    font-size:12px;
+    color:var(--text-2);
+    margin-bottom:6px;
+  }
+
+  .title{
+    font-size:16px;
+    font-weight:700;
+    color:var(--text);
+    line-height:1.25;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
+  .author{
+    font-size:14px;
+    color:var(--text);
+    margin-top:6px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
+  .empty-state{
+    margin-top:12px;
+    padding:14px;
+    border-radius:16px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    box-shadow: var(--shadow);
+    color: var(--text-2);
+  }
+  .empty-state .title{
+    font-size:16px;
+    font-weight:700;
+    color:var(--text);
+    margin-bottom:4px;
+  }
+</style>
+
+<div class="p-wrap">
+
+  <!-- Top row: Avatar + info (Figma) -->
+  {% if user.avatar %}
+    <div class="profile-top">
+      <div class="avatar" aria-hidden="true"
+           style="background-image: url('{{ url_for('static', filename=user.avatar) }}');"></div>
+      <div class="info">
+        <div class="name">{{ user.name }}</div>
+        <div class="handle">{{ user.handle }}</div>
+
+        {% if user.bio %}
+          <div class="bio">{{ user.bio }}</div>
+        {% else %}
+          <div class="bio placeholder">Tell people a little about you…</div>
+        {% endif %}
+      </div>
+    </div>
+  {% else %}
+    <div class="profile-top">
+      <div class="avatar" aria-hidden="true"></div>
+      <div class="info">
+        <div class="name">{{ user.name }}</div>
+        <div class="handle">{{ user.handle }}</div>
+
+        {% if user.bio %}
+          <div class="bio">{{ user.bio }}</div>
+        {% else %}
+          <div class="bio placeholder">Tell people a little about you…</div>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+
+  <!-- Stats -->
+  <div class="stats">
+  <a href="{{ url_for('my_reviews') }}" class="stat-card stat-link">
+    <div class="stat-num">{{ your_reviews|length }}</div>
+    <div class="stat-label">Reviews</div>
+  </a>
+
+  <a href="{{ url_for('followers') }}" class="stat-card stat-link">
+    <div class="stat-num">{{ followers_count|default(0) }}</div>
+    <div class="stat-label">Followers</div>
+  </a>
+
+  <a href="{{ url_for('following') }}" class="stat-card stat-link">
+    <div class="stat-num">{{ following_count|default(0) }}</div>
+    <div class="stat-label">Following</div>
+  </a>
+</div>
+
+  <!-- Actions (fixed + matches Figma) -->
+  <div class="actions">
+    <a href="{{ url_for('edit_profile') }}" class="action-btn">Edit Profile</a>
+    <a href="{{ url_for('share_profile') }}" class="action-btn">Share Profile</a>
+  </div>
+
+  <!-- Reviews -->
+  <div class="reviews-wrap">
+    <div class="reviews-head">
+      <div class="reviews-title">Your Reviews</div>
+      <a href="{{ url_for('my_reviews') }}" class="seeall">See all</a>
+    </div>
+
+    {% if your_reviews and your_reviews|length %}
+      <div class="grid">
+        {% for r in your_reviews %}
+          <a href="{{ url_for('book_details', title=r.book_title) }}" class="review-card">
+            <div class="thumb">
+              <img
+                src="{{ r.book_cover }}"
+                alt="{{ r.book_title }}"
+                onerror="this.onerror=null;this.src='https://placehold.co/400x400/EEE/AAA?text=No+Cover';"
+              >
+            </div>
+            <div class="meta">
+              <div class="avg">{{ '%.2f'|format(r.avg_rating) if r.avg_rating is defined else '' }}{% if r.avg_rating is defined %} avg rating{% endif %}</div>
+              <div class="title">{{ r.book_title }}</div>
+              <div class="author">{{ r.book_author }}</div>
+            </div>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <div class="title">No reviews yet</div>
+        Reviews you write will appear here.
+      </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

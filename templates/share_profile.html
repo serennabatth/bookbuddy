@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block appbar %}
+  <a class="navicon" href="{{ url_for('profile_page') }}" aria-label="Back">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="15 18 9 12 15 6"></polyline>
+    </svg>
+  </a>
+  <div class="h1">Share Profile</div>
+{% endblock %}
+
+{% block content %}
+<style>
+  .wrap { max-width:420px; margin:0 auto; padding:16px 16px 112px; }
+
+  /* Header */
+  .head { display:flex; flex-direction:column; align-items:center; gap:8px; margin-bottom:8px; }
+  .avatar { width:96px; height:96px; border-radius:50%; background:#E5E7EB; }
+  .name { font-weight:700; }
+  .handle { color:#6B7280; font-size:13px; }
+
+  /* Actions row */
+  .actions { display:flex; gap:8px; flex-wrap:wrap; margin:12px 0 4px; }
+  .button {
+    flex:1 1 140px; height:44px; border-radius:12px; border:1px solid #E5E7EB;
+    background:#fff; font-weight:600; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .button:active { transform: translateY(0.5px); }
+
+  /* Section header */
+  .section { display:flex; align-items:center; justify-content:space-between; margin:16px 0 8px; }
+  .title { font-weight:700; }
+  .seeall { font-size:12px; color:#6B7280; text-decoration:none; }
+
+  /* Books grid (reusing your card look) */
+  .grid { display:grid; grid-template-columns:repeat(2,1fr); gap:16px; }
+  .card { text-decoration:none; color:inherit; background:#fff; border-radius:12px; overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,.08); display:block; }
+  .card img { width:100%; height:180px; object-fit:cover; display:block; }
+  .meta { padding:8px; }
+  .meta .title {
+    font-size:14px; font-weight:600; line-height:1.25; margin:0 0 2px;
+    overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2;
+  }
+  .meta .sub { font-size:12px; color:#6B7280; }
+
+  /* QR modal + toast */
+  .modal { position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; align-items:center; justify-content:center; z-index:50; }
+  .modal.open { display:flex; }
+  .modal-card { background:#fff; border-radius:16px; padding:16px; box-shadow:0 10px 30px rgba(0,0,0,.25); width:min(92vw,360px); text-align:center; }
+  .modal-card img { width:260px; height:260px; object-fit:contain; display:block; margin:8px auto; }
+  .close { margin-top:8px; display:inline-flex; align-items:center; justify-content:center; height:40px; padding:0 14px; border-radius:10px; border:1px solid #E5E7EB; background:#fff; cursor:pointer; }
+
+  .toast { position:fixed; left:50%; transform:translateX(-50%); bottom:110px; background:#111; color:#fff; padding:8px 12px; border-radius:999px; font-size:13px; display:none; z-index:60; }
+  .toast.show { display:block; }
+</style>
+
+{% set handle_clean = (user.handle or '')|replace('@','') %}
+{% set share_url = url_for('public_profile', handle=handle_clean, _external=True) if handle_clean else url_for('profile_page', _external=True) %}
+
+<div class="wrap">
+  <!-- Header -->
+  <header class="head">
+    <div class="avatar" aria-hidden="true"></div>
+    <div class="name">{{ user.name }}</div>
+    <div class="handle">{{ user.handle }}</div>
+  </header>
+
+  <!-- Actions -->
+  <div class="actions">
+    <button id="copyBtn" class="button">Copy Profile Link</button>
+    <button id="shareBtn" class="button">Share via…</button>
+    <button id="qrBtn" class="button">Show QR Code</button>
+  </div>
+
+  <!-- Shared Books -->
+  <div class="section">
+    <div class="title">Shared Books</div>
+    <!-- Optional See all — wire later if you add a dedicated page -->
+    <!-- <a class="seeall" href="#">See all</a> -->
+  </div>
+  <div class="grid">
+    {% for b in books[:6] %}
+      <a class="card" href="{{ url_for('book_details', title=b.title) }}">
+        <img
+  src="{{ b.cover }}"
+  alt="{{ b.title }}"
+  onerror="this.onerror=null;this.src='{{ PLACEHOLDER_COVER }}';">
+
+        <div class="meta">
+          <div class="title">{{ b.title }}</div>
+          <div class="sub">{{ b.author }}</div>
+        </div>
+      </a>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- QR Modal -->
+<div class="modal" id="qrModal" aria-hidden="true">
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="qrTitle">
+    <div id="qrTitle" style="font-weight:700; margin-bottom:6px;">Scan to view profile</div>
+    <img src="{{ url_for('qr_profile', url=share_url) }}" alt="QR code">
+    <button class="close" id="closeQr">Close</button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast">Copied!</div>
+
+<script>
+  const shareUrl = "{{ share_url }}";
+
+  // Copy link
+  document.getElementById('copyBtn').addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      const t = document.getElementById('toast');
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 1400);
+    } catch (e) {
+      alert('Copy failed. URL:\n' + shareUrl);
+    }
+  });
+
+  // Native share (fallback to mailto)
+  document.getElementById('shareBtn').addEventListener('click', async () => {
+    const data = { title: 'BookBuddy profile', text: 'Check out my BookBuddy profile', url: shareUrl };
+    if (navigator.share) {
+      try { await navigator.share(data); } catch (e) { /* user cancelled */ }
+    } else {
+      const mailto = `mailto:?subject=${encodeURIComponent('My BookBuddy profile')}&body=${encodeURIComponent(shareUrl)}`;
+      window.location.href = mailto;
+    }
+  });
+
+  // QR modal
+  const modal = document.getElementById('qrModal');
+  document.getElementById('qrBtn').addEventListener('click', () => modal.classList.add('open'));
+  document.getElementById('closeQr').addEventListener('click', () => modal.classList.remove('open'));
+  modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('open'); });
+</script>
+{% endblock %}

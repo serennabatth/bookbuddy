@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% set top_rated = top_rated | default([]) %}
+
+{% block appbar %}
+  <a class="navicon" href="{{ url_for('browse') }}" aria-label="Back">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="15 18 9 12 15 6"></polyline>
+    </svg>
+  </a>
+  <div class="h1 clamp-1">{{ book.title }}</div>
+{% endblock %}
+
+{% block content %}
+<style>
+  .wrap { max-width:420px; margin:0 auto; padding:16px 16px 112px; }
+
+  .head { display:grid; grid-template-columns: 140px 1fr; gap:16px; align-items:start; }
+  .cover { width:140px; height:200px; border-radius:12px; overflow:hidden; box-shadow:var(--shadow); background:var(--card); border:1px solid var(--border); }
+  .cover img { width:100%; height:100%; object-fit:cover; display:block; }
+
+  .meta .avg { font-size:12px; color:var(--text-2); margin-bottom:6px; }
+  .meta .title { font-size:18px; line-height:1.25; margin:0 0 4px; }
+  .meta .author { font-size:14px; color:var(--text-2); margin:0 0 12px; }
+
+  .btns { display:grid; grid-template-columns:1fr; gap:10px; max-width:220px; }
+  .btns .button { height:44px; border-radius:12px; border:1px solid var(--border); background:var(--card); color:var(--text); cursor:pointer; }
+  .btns .button.primary { background:#111; color:#fff; border:none; }
+
+  .desc { margin:16px 0 8px; font-size:14px; line-height:1.55; color:var(--text); }
+
+  .section { display:flex; align-items:center; justify-content:space-between; margin:16px 0 8px; }
+  .section .title { font-size:13px; color:var(--text); }
+  .see { font-size:12px; color:var(--text-2); text-decoration:none; }
+
+  .reviews { background:var(--card); border-radius:12px; box-shadow:var(--shadow); overflow:hidden; border:1px solid var(--border); }
+  .rev { padding:12px; }
+  .rev + .rev { border-top:1px solid var(--border); }
+  .rev-head { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .stars { letter-spacing:1px; }
+  .stars span { font-size:15px; }
+  .user { font-size:13px; color:var(--text-2); }
+  .rev-text { margin:6px 0 4px; font-size:14px; color:var(--text); }
+  .age { font-size:12px; color:var(--text-2); }
+
+  @media (max-width:380px){
+    .head { grid-template-columns:120px 1fr; }
+    .cover { width:120px; height:180px; }
+  }
+</style>
+
+<div class="wrap">
+  <div class="head">
+    <div class="cover">
+      <img
+        src="{{ book.cover }}"
+        alt="{{ book.title }}"
+        onerror="this.onerror=null;this.src='https://placehold.co/400x600/EEE/AAA?text=No+Cover';"
+      >
+    </div>
+
+    <div class="meta">
+      <div class="avg">{{ '%.2f'|format(book.rating) }} avg rating</div>
+      <h2 class="title">{{ book.title }}</h2>
+      <div class="author">{{ book.author }}</div>
+
+      <div class="btns">
+        <button
+          id="favBtn"
+          class="button"
+          type="button"
+          aria-label="Toggle favourite"
+          data-book-id="{{ book_id|default(0) }}"
+        >
+          Favourite
+        </button>
+
+        <a class="button primary"
+           href="{{ url_for('add_review') }}"
+           style="text-align:center; display:flex; align-items:center; justify-content:center; text-decoration:none;">
+          Add Review
+        </a>
+      </div>
+    </div>
+  </div>
+
+  {% if description %}
+    <p class="desc">{{ description }}</p>
+  {% endif %}
+
+  <div class="section">
+    <div class="title">User reviews</div>
+    <a class="see" href="{{ url_for('book_reviews', title=book.title) }}">See all</a>
+  </div>
+
+  {% if reviews %}
+    <div class="reviews">
+      {% for r in reviews %}
+        <div class="rev">
+          <div class="rev-head">
+            <div class="stars" aria-label="{{ r.rating|int }} out of 5 stars">
+              {% set rt = (r.rating|int) %}
+              {% for _ in range(rt) %}<span>★</span>{% endfor %}
+              {% for _ in range(5 - rt) %}<span style="color:#D1D5DB;">★</span>{% endfor %}
+            </div>
+            <div class="user clamp-1">{{ r.user or "reader" }}</div>
+          </div>
+
+          <div class="rev-text">“{{ r.text }}”</div>
+          <div class="age">{{ r.age }}</div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="title">No reviews yet</div>
+    Be the first to review this book.
+  </div>
+{% endif %}
+</div>
+
+<script>
+  (function () {
+    const favBtn = document.getElementById("favBtn");
+    if (!favBtn) return;
+
+    const BOOK_ID = parseInt(favBtn.dataset.bookId || "0", 10);
+    if (!BOOK_ID) {
+      favBtn.disabled = true;
+      favBtn.textContent = "Favourite";
+      return;
+    }
+
+    function setFavUI(isFav) {
+      favBtn.textContent = isFav ? "Favourited" : "Favourite";
+      favBtn.classList.toggle("is-active", isFav);
+    }
+
+    async function addHistory() {
+      try {
+        await fetch("/api/history/add", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ book_id: BOOK_ID })
+        });
+      } catch {}
+    }
+
+    async function getFavourites() {
+      try {
+        const res = await fetch("/api/favourites", { credentials: "same-origin" });
+        if (!res.ok) return [];
+        return await res.json();
+      } catch {
+        return [];
+      }
+    }
+
+    async function toggleFavourite() {
+      try {
+        const res = await fetch("/api/favourites/toggle", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ book_id: BOOK_ID })
+        });
+        if (!res.ok) return null;
+        return await res.json(); // expects { favourited: true/false }
+      } catch {
+        return null;
+      }
+    }
+
+    // 1) history on view
+    addHistory();
+
+    // 2) initial favourite state
+    (async () => {
+      const favs = await getFavourites();
+      const isFav = Array.isArray(favs) && favs.some(x =>
+        (x && typeof x === "object") ? x.book_id === BOOK_ID : x === BOOK_ID
+      );
+      setFavUI(isFav);
+    })();
+
+    // 3) toggle
+    favBtn.addEventListener("click", async () => {
+      const out = await toggleFavourite();
+      if (out && typeof out.favourited === "boolean") {
+        setFavUI(out.favourited);
+      }
+    });
+  })();
+</script>
+{% endblock %}

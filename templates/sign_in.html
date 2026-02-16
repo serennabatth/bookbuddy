@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+  .auth-wrap{
+    max-width:420px;
+    margin:0 auto;
+    padding:48px 20px 28px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    text-align:center;
+  }
+
+  .brand{
+    font-size:30px;
+    font-weight:700;
+    color:var(--text);
+    margin-top:6px;
+    margin-bottom:22px;
+    letter-spacing:-0.02em;
+  }
+
+  .title{
+    font-size:20px;
+    font-weight:500;
+    margin-bottom:18px;
+    color:var(--text);
+  }
+
+  form{
+    width:100%;
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+  }
+
+  .field{
+    display:flex;
+    flex-direction:column;
+    text-align:left;
+    gap:8px;
+  }
+
+  .label{
+    font-size:16px;
+    font-weight:700;
+    color:var(--text);
+    margin-left:2px;
+  }
+
+  .input{
+    height:50px;
+    border-radius:16px;
+    border:1px solid var(--border);
+    background:var(--card);
+    box-shadow:var(--shadow);
+    padding:0 16px;
+    font-size:16px;
+    font-family:inherit;
+    color:var(--text);
+  }
+
+  .btn-dark{
+    height:50px;
+    width:100%;
+    border-radius:14px;
+    background:#111;
+    color:#fff;
+    border:none;
+    box-shadow:var(--shadow);
+    font-family:inherit;
+    font-size:16px;
+    font-weight:700;
+    cursor:pointer;
+    margin-top:4px;
+  }
+  .btn-dark:active{ filter: brightness(.96); }
+
+  .forgot{
+    width:100%;
+    display:flex;
+    justify-content:flex-end;
+    margin-top:2px;
+  }
+  .forgot a{
+    font-size:14px;
+    color:var(--text-2);
+    text-decoration:none;
+    font-weight:500;
+  }
+
+  .newto{
+    margin-top:22px;
+    font-size:14px;
+    color:var(--text);
+    font-weight:500;
+  }
+
+  /* ✅ UPDATED: white secondary buttons */
+  .btn-light,
+  .social-btn{
+    width:100%;
+    height:50px;
+    margin-top:10px;
+    border-radius:14px;
+    background:#fff;                 /* pure white */
+    border:1px solid var(--border);
+    box-shadow:var(--shadow);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+    text-decoration:none;
+    color:#111;                      /* black text */
+    font-family:inherit;
+    font-size:16px;
+    font-weight:600;
+    cursor:pointer;
+  }
+
+  .btn-light:active,
+  .social-btn:active{
+    filter: brightness(.97);
+  }
+
+  .or{
+    margin:18px 0 12px;
+    font-size:14px;
+    color:var(--text-2);
+  }
+
+  .social{
+    width:100%;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+  }
+
+  .icon{
+    width:18px;
+    height:18px;
+    display:inline-block;
+  }
+</style>
+
+<div class="auth-wrap">
+  <div class="brand">BookBuddy</div>
+  <div class="title">Login</div>
+
+  <form method="POST" action="{{ url_for('login') }}">
+    <div class="field">
+      <label class="label" for="username">Username</label>
+      <input id="username" name="username" class="input" type="text" placeholder="email@domain.com" required>
+    </div>
+
+    <div class="field">
+      <label class="label" for="password">Password</label>
+      <input id="password" name="password" class="input" type="password" placeholder="password123" required>
+    </div>
+
+    <button class="btn-dark" type="submit">Continue</button>
+
+    <div class="forgot">
+      <a href="{{ url_for('forgot_password') }}">Forgot password?</a>
+    </div>
+  </form>
+
+  <div class="newto">New to BookBuddy?</div>
+  <a class="btn-light" href="{{ url_for('signup') }}">Sign Up</a>
+
+  <div class="or">or</div>
+
+  <div class="social">
+    <button class="social-btn" type="button">
+      <img class="icon" src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" alt="">
+      Continue with Google
+    </button>
+    <button class="social-btn" type="button">
+      <img class="icon" src="https://upload.wikimedia.org/wikipedia/commons/f/fa/Apple_logo_black.svg" alt="">
+      Continue with Apple
+    </button>
+  </div>
+</div>
+{% endblock %}

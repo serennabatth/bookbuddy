@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}BookBuddy{% endblock %}</title>
+
+  <style>
+/* =============================
+   THEME TOKENS
+   ============================= */
+:root{
+  /* Light (your original) */
+  --bg:#F5EFE6;
+  --card:#FFFFFF;
+  --muted:#F9F7F3;
+  --border:#E6E2DC;
+  --text:#1C1C1C;
+  --text-2:#6B7280;
+  --shadow:0 1px 4px rgba(0,0,0,.1);
+
+  --radius:12px;
+  --safe-bottom:env(safe-area-inset-bottom,0px);
+  --tabbar-h:64px;
+  --appbar-h:56px;
+  --maxw:420px;
+}
+
+/* =============================
+   DARK THEME — ChatGPT-style.
+   No green accents; all UI dark.
+   ============================= */
+.theme-dark{
+  --bg:#1e1f22;
+  --card:#2c2d31;
+  --muted:#35363a;
+  --border:#3f4045;
+  --text:#f3f4f6;
+  --text-2:#a1a1aa;
+  --shadow:0 1px 6px rgba(0,0,0,.45);
+}
+
+/* ---- global structure ---- */
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  margin:0;
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji";
+  color:var(--text);
+  background:var(--bg);
+}
+a{color:inherit}
+
+.app{min-height:100dvh;display:flex;flex-direction:column;align-items:center}
+
+/* Top app bar */
+.appbar{
+  position:sticky;top:0;z-index:10;width:100%;
+  display:flex;align-items:center;gap:8px;
+  height:var(--appbar-h);background:var(--bg);
+  backdrop-filter:blur(6px);padding:0 16px;border-bottom:1px solid var(--border);
+}
+.appbar .h1{font-weight:700;font-size:18px;line-height:1}
+.navicon{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:36px;height:36px;border-radius:10px;
+  background:var(--card);border:1px solid var(--border);
+  box-shadow:var(--shadow);color:var(--text-2);text-decoration:none;
+}
+
+/* Page */
+main.content{
+  width:100%;max-width:var(--maxw);margin:0 auto;flex:1 1 auto;
+  padding-bottom:calc(var(--tabbar-h) + var(--safe-bottom) + 8px);
+}
+
+/* Bottom tab bar */
+.tabbar{
+  position:fixed;left:0;right:0;bottom:0;z-index:20;
+  background:var(--card);border-top:1px solid var(--border);
+  box-shadow:0 -1px 6px rgba(0,0,0,.06);
+  height:calc(var(--tabbar-h) + var(--safe-bottom));
+  display:flex;align-items:flex-start;justify-content:center;
+  padding-bottom:var(--safe-bottom);
+}
+.tabwrap{width:100%;max-width:var(--maxw);display:grid;grid-template-columns:repeat(5,1fr);gap:0;align-items:center;padding:8px 12px}
+.tab{display:flex;flex-direction:column;align-items:center;gap:4px;text-decoration:none;color:var(--text-2);padding:6px 4px;border-radius:10px}
+.tab svg{width:22px;height:22px}
+.tab span{font-size:11px}
+.tab.active{color:var(--text);background:var(--muted)}
+
+/* Shared card/surface styling */
+.card,.chip,.search,.gchip .circle,.featured,
+.grid .card,.section,.list,.row,input,textarea,select{
+  background:var(--card);color:var(--text);box-shadow:var(--shadow)
+}
+.sub,.meta .rating,.author,.section .seeall,.chip .icon{color:var(--text-2)}
+
+/* Inputs */
+input,textarea,select{
+  border:0;background:var(--muted);color:var(--text);
+}
+input::placeholder,textarea::placeholder{color:var(--text-2)}
+
+/* Buttons */
+.button, button{
+  display:inline-flex;align-items:center;justify-content:center;
+  height:44px;padding:0 16px;border-radius:12px;border:1px solid var(--border);
+  background:var(--card);color:var(--text);font-weight:600;cursor:pointer;text-decoration:none;
+}
+.button.primary,button.primary{background:#141517;color:#fff;border:1px solid var(--border)}
+.button.secondary,button.secondary{background:#1c1e21;color:#fff;border:1px solid var(--border)}
+.button:active,button:active{filter:brightness(.97)}
+
+.button.is-active {
+  background: #141517;
+  color: #fff;
+  border-color: var(--border);
+}
+
+/* Review/rows separators */
+.row{border-bottom:1px solid var(--border)}
+.row:last-child{border-bottom:none}
+
+/* Hide horizontal scrollbars */
+.chips-row,.genres,.grid{scrollbar-width:none}
+.chips-row::-webkit-scrollbar,.genres::-webkit-scrollbar,.grid::-webkit-scrollbar{display:none}
+
+/* Flash bubble */
+.flash-wrap{position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:60}
+.flash{background:#111;color:#fff;padding:8px 12px;border-radius:999px;font-size:13px;box-shadow:var(--shadow)}
+  
+ .empty-state{
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 14px;
+  box-shadow: var(--shadow);
+  color: var(--text-2);
+  font-size: 14px;
+  line-height: 1.4;
+}
+.empty-state .title{
+  color: var(--text);
+  font-weight: 700;
+  margin-bottom: 4px;
+  font-size: 14px;
+}
+ 
+/* Text clamping (global) */
+.clamp-1{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.clamp-2{
+  display:-webkit-box;
+  -webkit-box-orient:vertical;
+  -webkit-line-clamp:2;
+  line-clamp:2;
+  overflow:hidden;
+}
+
+.clamp-3{
+  display:-webkit-box;
+  -webkit-box-orient:vertical;
+  -webkit-line-clamp:3;
+  line-clamp:3;
+  overflow:hidden;
+}
+
+
+  </style>
+
+  {% block head %}{% endblock %}
+</head>
+
+<!-- Theme init + toggle helper -->
+<script>
+(function () {
+  const KEY = 'bb_theme';
+  const saved = localStorage.getItem(KEY);
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const useDark = saved === 'dark' || (!saved && prefersDark);
+
+  document.addEventListener('DOMContentLoaded', () => {
+    document.body.classList.toggle('theme-dark', useDark);
+    const toggle = document.getElementById('themeToggle');
+    if (toggle) toggle.checked = useDark;
+  });
+
+  window.toggleTheme = function () {
+    const isDark = document.body.classList.toggle('theme-dark');
+    localStorage.setItem(KEY, isDark ? 'dark' : 'light');
+    const t = document.getElementById('themeToggle');
+    if (t) t.checked = isDark;
+  };
+})();
+</script>
+
+<div id="toast"
+     style="display:none; position:fixed; bottom:90px; left:50%; transform:translateX(-50%);
+            background:#111; color:#fff; padding:10px 14px; border-radius:999px;
+            font-size:13px; z-index:100;">
+</div>
+
+<script>
+  function socialUnavailable(provider) {
+    const toast = document.getElementById("toast");
+    toast.textContent = provider + " sign-in is coming soon. Use email instead.";
+    toast.style.display = "block";
+    setTimeout(() => toast.style.display = "none", 2500);
+  }
+</script>
+
+
+<body>
+  <div class="app">
+
+    <!-- Top App Bar -->
+    <header class="appbar">
+      {% block appbar %}{% endblock %}
+    </header>
+
+    <!-- Flash -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flash-wrap" role="status" aria-live="polite">
+          {% for cat, msg in messages %}
+            <div class="flash">{{ msg }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <!-- Page Content -->
+    <main class="content">
+      {% block content %}{% endblock %}
+    </main>
+
+    <!-- Bottom Tab Bar -->
+    {% set ep = request.endpoint or '' %}
+    <nav class="tabbar" role="navigation" aria-label="Primary">
+      <div class="tabwrap">
+
+        <a class="tab {% if ep in ['home'] %}active{% endif %}" href="{{ url_for('home') }}">
+          <span>Home</span>
+        </a>
+
+        <a class="tab {% if ep in ['browse','top_rated','history','favourites','following','followers'] %}active{% endif %}" href="{{ url_for('browse') }}">
+          <span>Browse</span>
+        </a>
+
+        <a class="tab {% if ep in ['add_review','add_book'] %}active{% endif %}" href="{{ url_for('add_review') }}">
+          <span>Add</span>
+        </a>
+
+        <a class="tab {% if ep in ['profile_page','settings','edit_profile','share_profile','change_password','privacy_settings','language_settings','notifications_settings','theme_settings'] %}active{% endif %}" href="{{ url_for('profile_page') }}">
+          <span>Profile</span>
+        </a>
+
+      </div>
+    </nav>
+
+  </div>
+
+ {% block scripts %}{% endblock %}
+<script>
+  function socialUnavailable(provider) {
+    alert(provider + " sign-in is coming soon.\n\nFor now, please use email and password.");
+  }
+</script>
+</body>
+</html>
+

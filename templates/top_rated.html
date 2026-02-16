@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+
+{% block appbar %}
+  <a class="navicon" href="{{ url_for('home') }}" aria-label="Back">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="15 18 9 12 15 6"></polyline>
+    </svg>
+  </a>
+  <div class="h1">Top Rated</div>
+{% endblock %}
+
+{% block content %}
+<style>
+  .wrap { padding: 0 16px 24px; }
+
+  /* Search + sort row */
+  .toprow { display:flex; gap:10px; align-items:center; margin-bottom:12px; }
+  .search {
+    flex:1;
+    display:flex; align-items:center; gap:10px;
+    background:var(--card);
+    border-radius:12px;
+    padding:10px 12px;
+    box-shadow:var(--shadow);
+    border:1px solid var(--border);
+  }
+  .search .icon { width:18px; height:18px; color:var(--text-2); flex:0 0 18px; }
+  .search input { border:0; outline:0; background:transparent; width:100%; font-size:14px; color:var(--text); }
+
+  .sort{
+    width:120px;
+    height:44px;
+    border-radius:12px;
+    border:1px solid var(--border);
+    background:var(--card);
+    box-shadow:var(--shadow);
+    color:var(--text);
+    padding:0 10px;
+    font-size:13px;
+  }
+
+  .meta-row{
+    display:flex; align-items:center; justify-content:space-between;
+    margin:2px 0 10px;
+    color:var(--text-2);
+    font-size:12px;
+  }
+
+  /* Grid (match Browse) */
+  .grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:16px; }
+  .card{
+    text-decoration:none; color:inherit;
+    background:var(--card);
+    border-radius:12px;
+    overflow:hidden;
+    box-shadow:var(--shadow);
+    border:1px solid var(--border);
+    display:block;
+  }
+  .card img{ width:100%; height:180px; object-fit:cover; display:block; background:var(--muted); }
+  .bmeta{ padding:8px; }
+  .bmeta .rating{ font-size:12px; color:var(--text-2); margin-bottom:4px; }
+  .bmeta .title{
+    font-size:14px; font-weight:600; line-height:1.25;
+    overflow:hidden;
+    display:-webkit-box;
+    -webkit-box-orient:vertical;
+    -webkit-line-clamp:2;
+    line-clamp:2;
+  }
+  .bmeta .author{ font-size:12px; color:var(--text-2); margin-top:2px; }
+
+  .empty {
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:16px;
+    box-shadow:var(--shadow);
+    padding:16px;
+    text-align:center;
+    color:var(--text-2);
+  }
+  .empty .t { color:var(--text); font-weight:700; margin-bottom:6px; }
+</style>
+
+<div class="wrap">
+  {% set q = (request.args.get('q') or '') | lower %}
+
+  <!-- Search + Sort -->
+  <div class="toprow">
+    <form class="search" action="{{ url_for('top_rated') }}" method="get">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="7"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+      <input id="q" type="text" name="q" value="{{ (request.args.get('q') or '')|e }}" placeholder="Search title or author">
+    </form>
+
+    <select id="sort" class="sort" aria-label="Sort">
+      <option value="rating">Rating</option>
+      <option value="az">A–Z</option>
+      <option value="newest">Newest</option>
+    </select>
+  </div>
+
+  {# Filtered list for counts + empty state #}
+  {% set filtered = [] %}
+  {% for b in books %}
+    {% if (not q) or (q in (b.title|lower)) or (q in (b.author|lower)) %}
+      {% set _ = filtered.append(b) %}
+    {% endif %}
+  {% endfor %}
+
+  <div class="meta-row">
+    <div>{{ filtered|length }} results</div>
+    {% if request.args.get('q') %}
+      <div>Searching: “{{ request.args.get('q') }}”</div>
+    {% endif %}
+  </div>
+
+  {% if filtered and filtered|length %}
+    <div class="grid" id="grid">
+      {% for b in filtered %}
+        <a class="card"
+           href="{{ url_for('book_details', title=b.title) }}"
+           data-title="{{ (b.title or '')|lower }}"
+           data-author="{{ (b.author or '')|lower }}"
+           data-year="{{ (b.year or '0') }}"
+           data-rating="{{ (b.rating or 0) }}">
+          <img
+          src="{{ b.cover }}"
+          alt="{{ b.title }}"
+          onerror="this.onerror=null;this.src='https://placehold.co/400x600/EEE/AAA?text=No+Cover';"
+          >
+
+          <div class="bmeta">
+            <div class="rating">{{ '%.2f'|format(b.rating) }} avg rating</div>
+            <div class="title clamp-2">{{ b.title }}</div><div class="author clamp-1">{{ b.author }}</div>
+
+          </div>
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty">
+      <div class="t">No books found</div>
+      <div>Try a different search.</div>
+      <div style="margin-top:10px;">
+        <a class="button" href="{{ url_for('top_rated') }}" style="height:40px;">Reset</a>
+      </div>
+    </div>
+  {% endif %}
+</div>
+
+<script>
+  (function () {
+    const sort = document.getElementById('sort');
+    const grid = document.getElementById('grid');
+    if (!sort || !grid) return;
+
+    function toNum(v) {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    function sortCards(mode) {
+      const cards = Array.from(grid.querySelectorAll('.card'));
+      cards.sort((a, b) => {
+        if (mode === 'az') return (a.dataset.title || '').localeCompare(b.dataset.title || '');
+        if (mode === 'newest') return toNum(b.dataset.year) - toNum(a.dataset.year);
+        // rating
+        return toNum(b.dataset.rating) - toNum(a.dataset.rating);
+      });
+      cards.forEach(c => grid.appendChild(c));
+    }
+
+    sort.addEventListener('change', () => sortCards(sort.value));
+    sortCards(sort.value);
+  })();
+</script>
+{% endblock %}

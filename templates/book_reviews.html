@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block appbar %}
+  <a class="navicon" href="{{ url_for('book_details', title=book.title) }}" aria-label="Back">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="15 18 9 12 15 6"></polyline>
+    </svg>
+  </a>
+  <div class="h1">Reviews</div>
+{% endblock %}
+
+{% block content %}
+<style>
+  .wrap{ max-width:420px; margin:0 auto; padding:16px 16px 112px; }
+  .top{ margin-bottom:12px; }
+  .book-title{ font-size:16px; font-weight:700; color:var(--text); margin:0 0 4px; }
+  .book-sub{ font-size:13px; color:var(--text-2); margin:0; }
+  .summary{ font-size:12px; color:var(--text-2); margin-top:10px; }
+
+  .reviews{ background:var(--card); border-radius:12px; box-shadow:var(--shadow); overflow:hidden; border:1px solid var(--border); }
+  .rev{ padding:12px; }
+  .rev + .rev{ border-top:1px solid var(--border); }
+  .rev-head{ display:flex; justify-content:space-between; gap:10px; align-items:center; }
+  .user{ font-size:13px; color:var(--text-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:60%; }
+  .stars{ letter-spacing:1px; }
+  .stars span{ font-size:15px; }
+  .text{ margin:8px 0 6px; font-size:14px; color:var(--text); line-height:1.5; }
+  .date{ font-size:12px; color:var(--text-2); }
+
+  .empty{ color:var(--text-2); font-size:14px; margin-top:16px; }
+</style>
+
+<div class="wrap">
+  <div class="top">
+    <p class="book-title">{{ book.title }}</p>
+    <p class="book-sub">{{ book.author }}</p>
+    <div class="summary">
+      {{ '%.2f'|format(avg_rating) }} avg rating • {{ review_count }} review{{ '' if review_count == 1 else 's' }}
+    </div>
+  </div>
+
+  {% if reviews and reviews|length %}
+    <div class="reviews">
+      {% for r in reviews %}
+        <div class="rev">
+          <div class="rev-head">
+            <div class="user">{{ r.user }}</div>
+            <div class="stars" aria-label="{{ r.rating }} out of 5 stars">
+              {% set rt = r.rating|int %}
+              {% for _ in range(rt) %}<span>★</span>{% endfor %}
+              {% for _ in range(5-rt) %}<span style="color:#D1D5DB;">★</span>{% endfor %}
+            </div>
+          </div>
+
+          {% if r.text %}
+            <div class="text">“{{ r.text }}”</div>
+          {% endif %}
+
+          <div class="date">
+            {{ r.age or "" }}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="title">No reviews yet</div>
+    Be the first to review this book.
+  </div>
+{% endif %}
+</div>
+{% endblock %}

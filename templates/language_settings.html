@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block appbar %}
+  <a class="navicon" href="{{ url_for('settings') }}" aria-label="Back">
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="15 18 9 12 15 6"></polyline>
+    </svg>
+  </a>
+
+  <div class="h1" style="flex:1;text-align:center;margin-right:36px;">
+    Language
+  </div>
+{% endblock %}
+
+{% block content %}
+<style>
+  .wrap{
+    max-width:420px;
+    margin:0 auto;
+    padding:16px;
+    min-height:calc(100vh - 56px);
+  }
+
+  .section-label{
+    font-size:13px;
+    color:var(--text-2);
+    margin:8px 6px 10px;
+  }
+
+  .list{
+    background:var(--card);
+    border-radius:16px;
+    box-shadow:var(--shadow);
+    overflow:hidden;
+  }
+
+  .row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:14px 16px;
+    border-bottom:1px solid var(--border);
+    cursor:pointer;
+  }
+  .row:last-child{ border-bottom:none; }
+
+  .row span{
+    font-size:16px;
+    font-weight:400; /* 👈 important: no bold */
+  }
+
+  /* hide native radio */
+  input[type="radio"]{ display:none; }
+
+  /* right-side indicator */
+  .indicator{
+    width:20px;
+    height:20px;
+    border-radius:999px;
+    border:2px solid #9CA3AF;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+
+  .indicator::after{
+    content:"";
+    width:10px;
+    height:10px;
+    border-radius:999px;
+    background:#111;
+    transform:scale(0);
+    transition:transform .12s ease;
+  }
+
+  input[type="radio"]:checked + .indicator{
+    border-color:#111;
+  }
+
+  input[type="radio"]:checked + .indicator::after{
+    transform:scale(1);
+  }
+
+  .actions{
+    display:flex;
+    gap:10px;
+    margin-top:18px;
+  }
+
+  .actions .button{
+    flex:1;
+    height:48px;
+    border-radius:12px;
+    font-weight:600;
+  }
+</style>
+
+<div class="wrap">
+  <div class="section-label">App</div>
+
+  <form method="POST" action="{{ url_for('language_settings') }}">
+    <div class="list">
+      {% for lang in langs %}
+        <label class="row" for="lang_{{ loop.index }}">
+          <span>{{ lang }}</span>
+
+          <div style="display:flex;align-items:center;gap:10px;">
+            <input
+              id="lang_{{ loop.index }}"
+              type="radio"
+              name="lang"
+              value="{{ lang }}"
+              {% if lang == current %}checked{% endif %}
+            >
+            <div class="indicator" aria-hidden="true"></div>
+          </div>
+        </label>
+      {% endfor %}
+    </div>
+
+    <div class="actions">
+      <a class="button secondary" href="{{ url_for('settings') }}">Cancel</a>
+      <button class="button primary" type="submit">Save</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

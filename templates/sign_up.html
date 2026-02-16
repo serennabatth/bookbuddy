@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+  .auth-wrap{
+    max-width:420px;
+    margin:0 auto;
+    padding:0px 20px 28px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    text-align:center;
+  }
+
+  .brand{
+    font-size:30px;
+    font-weight:700;
+    color:var(--text);
+    margin-top:6px;
+    margin-bottom:28px;
+    letter-spacing:-0.02em;
+  }
+
+  .title{
+    font-size:20px;
+    font-weight:600;
+    color:var(--text);
+    margin-bottom:6px;
+  }
+
+
+  form{
+    width:100%;
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+  }
+
+  .field{
+    display:flex;
+    flex-direction:column;
+    text-align:left;
+    gap:8px;
+  }
+
+  .label{
+    font-size:14px;
+    font-weight:600;
+    color:var(--text);
+    margin-left:2px;
+  }
+
+  .input{
+    height:50px;
+    border-radius:16px;
+    border:1px solid var(--border);
+    background:var(--card);
+    box-shadow:var(--shadow);
+    padding:0 16px;
+    font-size:16px;
+    font-family:inherit;
+    color:var(--text);
+  }
+
+  .btn-dark{
+    height:50px;
+    width:100%;
+    border-radius:14px;
+    background:#111;
+    color:#fff;
+    border:none;
+    box-shadow:var(--shadow);
+    font-family:inherit;
+    font-size:16px;
+    font-weight:700;
+    cursor:pointer;
+    margin-top:4px;
+  }
+  .btn-dark:active{ filter: brightness(.96); }
+
+  .or{
+    margin:18px 0 12px;
+    font-size:14px;
+    color:var(--text-2);
+  }
+
+  /* White secondary buttons (Google / Apple) */
+  .social{
+    width:100%;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+  }
+
+  .social-btn{
+    height:50px;
+    border-radius:14px;
+    background:#fff;
+    border:1px solid var(--border);
+    box-shadow:var(--shadow);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+    font-family:inherit;
+    font-size:16px;
+    font-weight:600;
+    color:#111;
+    cursor:pointer;
+  }
+  .social-btn:active{ filter: brightness(.97); }
+
+  .icon{
+    width:18px;
+    height:18px;
+    display:inline-block;
+  }
+
+  .sub{
+    margin-top:18px;
+    font-size:14px;
+    color:var(--text-2);
+  }
+
+  .sub a{
+    color:var(--text);
+    font-weight:600;
+    text-decoration:none;
+  }
+</style>
+
+<div class="auth-wrap">
+  <div class="brand">BookBuddy</div>
+
+  <div class="title">Create an account</div>
+
+  <form method="POST" action="{{ url_for('signup') }}">
+    <div class="field">
+      <label class="label" for="name">Full Name</label>
+      <input id="name" name="name" class="input" placeholder="e.g. Serenna Batth" required>
+    </div>
+
+    <div class="field">
+      <label class="label" for="handle">Username</label>
+      <input id="handle" name="handle" class="input" placeholder="e.g. serennabatth" required>
+    </div>
+
+    <div class="field">
+      <label class="label" for="email">Email</label>
+      <input id="email" name="email" class="input" type="email" placeholder="you@example.com" required>
+    </div>
+
+    <div class="field">
+      <label class="label" for="password">Password</label>
+      <input id="password" name="password" class="input" type="password" placeholder="••••••••" required>
+    </div>
+
+    <button class="btn-dark" type="submit">Continue</button>
+  </form>
+
+  <div class="or">or</div>
+
+  <div class="social">
+    <button class="social-btn" type="button">
+      <img class="icon" src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" alt="">
+      Continue with Google
+    </button>
+
+    <button class="social-btn" type="button">
+      <img class="icon" src="https://upload.wikimedia.org/wikipedia/commons/f/fa/Apple_logo_black.svg" alt="">
+      Continue with Apple
+    </button>
+  </div>
+
+  <div class="sub">
+    Already have an account?
+    <a href="{{ url_for('login') }}">Sign in</a>
+  </div>
+</div>
+{% endblock %}
