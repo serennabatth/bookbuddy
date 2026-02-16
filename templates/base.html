@@ -73,20 +73,64 @@ main.content{
   padding-bottom:calc(var(--tabbar-h) + var(--safe-bottom) + 8px);
 }
 
-/* Bottom tab bar */
+/* =============================
+   Bottom tab bar (icons only)
+   ============================= */
 .tabbar{
   position:fixed;left:0;right:0;bottom:0;z-index:20;
-  background:var(--card);border-top:1px solid var(--border);
+  background:var(--card);
+  border-top:1px solid var(--border);
   box-shadow:0 -1px 6px rgba(0,0,0,.06);
   height:calc(var(--tabbar-h) + var(--safe-bottom));
-  display:flex;align-items:flex-start;justify-content:center;
+  display:flex;
+  align-items:center;
+  justify-content:center;
   padding-bottom:var(--safe-bottom);
 }
-.tabwrap{width:100%;max-width:var(--maxw);display:grid;grid-template-columns:repeat(5,1fr);gap:0;align-items:center;padding:8px 12px}
-.tab{display:flex;flex-direction:column;align-items:center;gap:4px;text-decoration:none;color:var(--text-2);padding:6px 4px;border-radius:10px}
-.tab svg{width:22px;height:22px}
-.tab span{font-size:11px}
-.tab.active{color:var(--text);background:var(--muted)}
+
+.tabwrap{
+  width:100%;
+  max-width:var(--maxw);
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  align-items:center;
+  padding:10px 12px;
+  gap:0;
+}
+
+.tab{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  text-decoration:none;
+
+  /* darker inactive icons */
+  color: rgba(0,0,0,0.65);
+
+  padding:10px 6px;
+  border-radius:14px;            /* pill */
+  background:transparent;
+}
+
+.tab svg{
+  width:24px;
+  height:24px;
+  color:currentColor;
+
+  /* slightly thicker like your Figma */
+  stroke-width:2.2;
+}
+
+/* Hide labels under icons (keep spans in HTML for accessibility) */
+.tab span{
+  display:none;
+}
+
+.tab.active{
+  color:#111;                     /* strong active icon */
+  background:rgba(0,0,0,0.06);    /* active pill */
+}
 
 /* Shared card/surface styling */
 .card,.chip,.search,.gchip .circle,.featured,
@@ -128,8 +172,8 @@ input::placeholder,textarea::placeholder{color:var(--text-2)}
 /* Flash bubble */
 .flash-wrap{position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:60}
 .flash{background:#111;color:#fff;padding:8px 12px;border-radius:999px;font-size:13px;box-shadow:var(--shadow)}
-  
- .empty-state{
+
+.empty-state{
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 16px;
@@ -145,7 +189,7 @@ input::placeholder,textarea::placeholder{color:var(--text-2)}
   margin-bottom: 4px;
   font-size: 14px;
 }
- 
+
 /* Text clamping (global) */
 .clamp-1{
   overflow:hidden;
@@ -168,8 +212,6 @@ input::placeholder,textarea::placeholder{color:var(--text-2)}
   line-clamp:3;
   overflow:hidden;
 }
-
-
   </style>
 
   {% block head %}{% endblock %}
@@ -213,7 +255,6 @@ input::placeholder,textarea::placeholder{color:var(--text-2)}
   }
 </script>
 
-
 <body>
   <div class="app">
 
@@ -243,19 +284,35 @@ input::placeholder,textarea::placeholder{color:var(--text-2)}
     <nav class="tabbar" role="navigation" aria-label="Primary">
       <div class="tabwrap">
 
-        <a class="tab {% if ep in ['home'] %}active{% endif %}" href="{{ url_for('home') }}">
+        <a class="tab {% if ep in ['home'] %}active{% endif %}" href="{{ url_for('home') }}" aria-label="Home">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 10.5L12 3l9 7.5"></path>
+            <path d="M5 10v10h14V10"></path>
+          </svg>
           <span>Home</span>
         </a>
 
-        <a class="tab {% if ep in ['browse','top_rated','history','favourites','following','followers'] %}active{% endif %}" href="{{ url_for('browse') }}">
+        <a class="tab {% if ep in ['browse','top_rated','history','favourites','following','followers'] %}active{% endif %}" href="{{ url_for('browse') }}" aria-label="Browse">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 19.5V6.5A2.5 2.5 0 0 1 6.5 4H20v16H6.5A2.5 2.5 0 0 1 4 17.5"></path>
+            <path d="M8 4v16"></path>
+          </svg>
           <span>Browse</span>
         </a>
 
-        <a class="tab {% if ep in ['add_review','add_book'] %}active{% endif %}" href="{{ url_for('add_review') }}">
+        <a class="tab {% if ep in ['add_review','add_book'] %}active{% endif %}" href="{{ url_for('add_review') }}" aria-label="Add">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 5v14"></path>
+            <path d="M5 12h14"></path>
+          </svg>
           <span>Add</span>
         </a>
 
-        <a class="tab {% if ep in ['profile_page','settings','edit_profile','share_profile','change_password','privacy_settings','language_settings','notifications_settings','theme_settings'] %}active{% endif %}" href="{{ url_for('profile_page') }}">
+        <a class="tab {% if ep in ['profile_page','settings','edit_profile','share_profile','change_password','privacy_settings','language_settings','notifications_settings','theme_settings'] %}active{% endif %}" href="{{ url_for('profile_page') }}" aria-label="Profile">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20 21a8 8 0 0 0-16 0"></path>
+            <circle cx="12" cy="8" r="4"></circle>
+          </svg>
           <span>Profile</span>
         </a>
 
@@ -264,12 +321,11 @@ input::placeholder,textarea::placeholder{color:var(--text-2)}
 
   </div>
 
- {% block scripts %}{% endblock %}
-<script>
-  function socialUnavailable(provider) {
-    alert(provider + " sign-in is coming soon.\n\nFor now, please use email and password.");
-  }
-</script>
+  {% block scripts %}{% endblock %}
+  <script>
+    function socialUnavailable(provider) {
+      alert(provider + " sign-in is coming soon.\n\nFor now, please use email and password.");
+    }
+  </script>
 </body>
 </html>
-
