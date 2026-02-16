@@ -24,7 +24,7 @@
 
 {% block content %}
 <style>
-  /* Header bar white like Figma */
+  /* Header bar */
   header,
   .appbar,
   .topbar {
@@ -32,7 +32,7 @@
   }
   header { border-bottom: 1px solid rgba(0,0,0,.08); }
 
-  /* Back/gear icons: no box */
+  /* Back/gear icons */
   .navicon{
     background:none;
     border:none;
@@ -59,7 +59,7 @@
     padding:16px;
   }
 
-  /* Top section: avatar left, info right (Figma) */
+  /* Top section */
   .profile-top{
     display:flex;
     gap:18px;
@@ -71,9 +71,9 @@
   width:120px;
   height:120px;
   border-radius:50%;
-  background: var(--card);          /* same colour as edit profile */
-  border: 1px solid var(--border);  /* subtle outline */
-  box-shadow: var(--shadow);        /* same elevation */
+  background: var(--card);          
+  border: 1px solid var(--border);  
+  box-shadow: var(--shadow);        
   background-size:cover;
   background-position:center;
 }
@@ -105,7 +105,7 @@
   }
   .bio.placeholder{ color:var(--text-2); }
 
-  /* Stats: 3 cards like Figma */
+  /* Stats */
   .stats{
     display:grid;
     grid-template-columns:repeat(3, 1fr);
@@ -142,7 +142,7 @@
 }
 
 
-  /* Action buttons: white pills like Figma */
+  /* Action buttons */
   .actions{
     display:grid;
     grid-template-columns:1fr 1fr;
@@ -187,7 +187,7 @@
     text-decoration:none;
   }
 
-  /* Review cards: match Figma (cover, then text) */
+  /* Review cards */
   .grid{
     display:grid;
     grid-template-columns:repeat(2, 1fr);
@@ -263,7 +263,7 @@
 
 <div class="p-wrap">
 
-  <!-- Top row: Avatar + info (Figma) -->
+  <!-- Top row: Avatar + info -->
   {% if user.avatar %}
     <div class="profile-top">
       <div class="avatar" aria-hidden="true"
@@ -313,7 +313,7 @@
   </a>
 </div>
 
-  <!-- Actions (fixed + matches Figma) -->
+  <!-- Actions -->
   <div class="actions">
     <a href="{{ url_for('edit_profile') }}" class="action-btn">Edit Profile</a>
     <a href="{{ url_for('share_profile') }}" class="action-btn">Share Profile</a>

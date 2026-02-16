@@ -14,7 +14,7 @@
 
 {% block content %}
 <style>
-  /* ---- Header bar: match Edit Profile (white strip) ---- */
+  /* ---- Header bar ---- */
   header, .appbar, .topbar {
     background:#fff !important;
   }
@@ -22,7 +22,7 @@
     border-bottom:1px solid rgba(0,0,0,.08);
   }
 
-  /* Back arrow – remove any square styling */
+  /* Back arrow  */
   .navicon{
     background:none !important;
     border:none !important;
@@ -47,7 +47,7 @@
     padding:12px 16px 24px;
   }
 
-  /* ---- Search bar (NO inner rectangle) ---- */
+  /* ---- Search bar  ---- */
   .search{
     display:flex;
     align-items:center;
@@ -80,7 +80,7 @@
   }
   .search input::placeholder{ color:#9CA3AF; }
 
-  /* ---- LIST: force NO white panel behind it ---- */
+  /* ---- LIST ---- */
   .list{
     margin-top:14px;
     background:transparent !important;
@@ -90,13 +90,13 @@
     overflow:visible !important;
   }
 
-  /* Rows sit on page background with thin divider under each */
+  /* Rows */
   .row{
     display:flex;
     align-items:center;
     gap:14px;
     padding:18px 0;
-    background:transparent !important;  /* kills any leftover white */
+    background:transparent !important;  
     box-shadow:none !important;
     border-bottom:1px solid rgba(0,0,0,.12);
   }
@@ -126,7 +126,7 @@
     margin-top:6px;
   }
 
-  /* Remove button: same font system as rest of page */
+  /* Remove button */
   .pill{
     height:36px;
     min-width:132px;
@@ -134,11 +134,11 @@
     border-radius:10px;
     border:0;
     background:#fff;
-    box-shadow:none; /* Figma looks flat; tell me if you want shadow */
+    box-shadow:none; 
     color:var(--text);
-    font-family:inherit;      /* ✅ same font */
-    font-size:16px;           /* ✅ same sizing vibe */
-    font-weight:500;          /* ✅ not heavier than body */
+    font-family:inherit;      
+    font-size:16px;           
+    font-weight:500;          
     cursor:pointer;
   }
   .pill:active{ filter:brightness(.97); }

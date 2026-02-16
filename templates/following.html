@@ -14,11 +14,11 @@
 
 {% block content %}
 <style>
-  /* ---- Header bar: match Edit Profile (white strip) ---- */
+  /* ---- Header bar ---- */
   header, .appbar, .topbar { background:#fff !important; }
   header { border-bottom:1px solid rgba(0,0,0,.08); }
 
-  /* Back arrow – remove any square styling */
+  /* Back arrow  */
   .navicon{
     background:none !important;
     border:none !important;
@@ -43,7 +43,7 @@
     padding:12px 16px 24px;
   }
 
-  /* ---- Search bar (NO inner rectangle) ---- */
+  /* ---- Search bar  ---- */
   .search{
     display:flex;
     align-items:center;
@@ -76,7 +76,7 @@
   }
   .search input::placeholder{ color:#9CA3AF; }
 
-  /* ---- LIST: no white panel behind it ---- */
+  /* ---- LIST ---- */
   .list{
     margin-top:14px;
     background:transparent !important;
@@ -86,7 +86,7 @@
     overflow:visible !important;
   }
 
-  /* Rows sit on page background with thin divider under each */
+  /* Rows */
   .row{
     display:flex;
     align-items:center;
@@ -122,17 +122,17 @@
     margin-top:6px;
   }
 
-  /* Toggle button: same font system as the page */
+  /* Toggle button */
 .pill{
   height:36px;
   padding:0 16px;
   border-radius:10px;
-  background:#fff;                 /* white button */
-  color:var(--text);               /* same text colour */
+  background:#fff;                
+  color:var(--text);               
   border:1px solid rgba(0,0,0,.08);
-  font-family:inherit;             /* same font */
-  font-size:16px;                  /* match body text */
-  font-weight:500;                 /* NOT bold */
+  font-family:inherit;             
+  font-size:16px;                  
+  font-weight:500;                 
   cursor:pointer;
 }
 
