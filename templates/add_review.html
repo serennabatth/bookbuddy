@@ -307,10 +307,12 @@
 
 </div>
 
-<script id="book-data" type="application/json">{{ books|tojson|safe }}</script>
 
 <script>
-  const BOOKS = JSON.parse(document.getElementById('book-data').textContent) || [];
+  // Each search asks the server; this counter ignores answers to older searches
+  // that arrive after a newer one (e.g. typing "dra" then "drac" quickly).
+  let latestSearch = 0;
+  let searchTimer = null;
   const PLACEHOLDER = "https://placehold.co/400x600/EEE/AAA?text=No+Cover";
   const CHEVRON_SVG = '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>';
 
@@ -369,17 +371,20 @@
     addBookRow.classList.remove('is-hidden');
   }
 
-  function renderList(q){
-    ddList.innerHTML = '';
-    const term = (q || '').trim().toLowerCase();
+  async function renderList(q){
+    const term = (q || '').trim();
+    const searchId = ++latestSearch;
 
-    const results = BOOKS
-      .filter(b => {
-        const t = (b.title || '').toLowerCase();
-        const a = (b.author || '').toLowerCase();
-        return t.includes(term) || a.includes(term);
-      })
-      .slice(0, 12);
+    let results = [];
+    try {
+      const res = await fetch(`/api/search?q=${encodeURIComponent(term)}`, { credentials: 'same-origin' });
+      if (res.ok) results = await res.json();
+    } catch (e) {
+      results = [];
+    }
+    if (searchId !== latestSearch) return;  // a newer search has started; drop this one
+
+    ddList.innerHTML = '';
 
     // Top result row
     if (results.length){
@@ -466,7 +471,9 @@
   });
   input.addEventListener('input', (e) => {
     const v = e.target.value || '';
-    if (v.trim().length >= 1) renderList(v);
+    // Wait until typing pauses for 200 ms, so we don't search on every key press.
+    clearTimeout(searchTimer);
+    if (v.trim().length >= 1) searchTimer = setTimeout(() => renderList(v), 200);
     else closeDropdown();
   });
 

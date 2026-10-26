@@ -20,12 +20,14 @@ import secrets
 import sqlite3
 from datetime import datetime
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
-from sqlalchemy import event, func
+from sqlalchemy import event, func, or_
 from sqlalchemy.engine import Engine
 from urllib.parse import quote, urlparse
 from urllib.request import urlopen, Request
 import json
-from functools import lru_cache
+from dataclasses import dataclass
+import csv
+import click
 
 
 # -----------------------------------------------------------------------------
@@ -124,7 +126,8 @@ class User(UserMixin, db.Model):
     # Path inside /static, e.g. "uploads/avatars/user_4_photo.jpg", or "" for none.
     avatar = db.Column(db.String(255), default="")
 
-    __table_args__ = (db.UniqueConstraint("handle", name="uq_user_handle"),)
+    # A unique index (not a constraint) so SQLite can add it without rebuilding the table.
+    __table_args__ = (db.Index("uq_user_handle", "handle", unique=True),)
 
     def set_password(self, pw: str) -> None:
         self.password_hash = generate_password_hash(pw)
@@ -177,6 +180,10 @@ class Book(db.Model):
     olid = db.Column(db.String(50), default="", index=True)     
     cover_i = db.Column(db.String(50), default="")              
     isbn = db.Column(db.String(32), default="")                 
+
+    # Fetched from Open Library the first time someone opens the book page.
+    # None = not fetched yet, "" = Open Library has no description.
+    description = db.Column(db.Text, nullable=True)
 
     __table_args__ = (db.UniqueConstraint("title", "author", name="uq_book_title_author"),)
 
@@ -410,36 +417,97 @@ def _ol_best_match(title: str, author: str = "", timeout: int = 15) -> dict:
     return {"cover": cover, "cover_i": cover_i, "isbn": isbn, "olid": olid, "year": year}
 
 
-def all_books_ui() -> list[dict]:
-    """Every book as a dict for templates and JavaScript, with its average rating.
+BOOKS_PER_PAGE = 24
+SORT_OPTIONS = {
+    "rating": "Highest rated",
+    "reviews": "Most reviewed",
+    "title": "Title A–Z",
+    "newest": "Newest added",
+}
 
-    All average ratings come from ONE grouped query, not one per book.
-    Task 5 replaces this with paginated SQL queries.
+
+def books_with_ratings(q: str = "", genre: str = "", sort: str = "rating", rated_only: bool = False):
+    """A database query for books plus each one's average rating and review count.
+
+    Everything (searching, filtering, sorting) happens in the database,
+    so only the books on the current page are ever loaded into Python.
     """
-    # {book id: average rating} for every reviewed book.
-    avg_by_book = dict(
-        db.session.query(Review.book_id, func.avg(Review.rating))
-        .group_by(Review.book_id)
-        .all()
+    avg_rating = func.coalesce(func.avg(Review.rating), 0.0).label("avg_rating")
+    review_count = func.count(Review.id).label("review_count")
+    stmt = (
+        db.select(Book, avg_rating, review_count)
+        .outerjoin(Review, Review.book_id == Book.id)
+        .group_by(Book.id)
+    )
+    if genre:
+        stmt = stmt.where(func.lower(Book.genre) == genre.lower())
+    if q:
+        # autoescape: a % or _ typed by the user is searched for literally.
+        needle = q.lower()
+        stmt = stmt.where(or_(
+            func.lower(Book.title).contains(needle, autoescape=True),
+            func.lower(Book.author).contains(needle, autoescape=True),
+        ))
+    if rated_only:
+        stmt = stmt.having(func.count(Review.id) > 0)
+    order = {
+        "rating": (avg_rating.desc(), review_count.desc(), Book.title),
+        "reviews": (review_count.desc(), Book.title),
+        "title": (Book.title,),
+        "newest": (Book.id.desc(),),
+    }.get(sort, (avg_rating.desc(), review_count.desc(), Book.title))
+    return stmt.order_by(*order)
+
+
+@dataclass
+class BookPage:
+    """One page of results, with what the template needs for page links."""
+    items: list
+    page: int
+    total: int
+    per_page: int = BOOKS_PER_PAGE
+
+    @property
+    def pages(self) -> int:
+        return max(1, -(-self.total // self.per_page))  # rounds up
+
+    @property
+    def has_prev(self) -> bool:
+        return self.page > 1
+
+    @property
+    def has_next(self) -> bool:
+        return self.page < self.pages
+
+
+def paginate_books(stmt, page: int) -> BookPage:
+    total = db.session.scalar(db.select(func.count()).select_from(stmt.order_by(None).subquery()))
+    page = min(max(page, 1), max(1, -(-total // BOOKS_PER_PAGE)))
+    rows = db.session.execute(stmt.limit(BOOKS_PER_PAGE).offset((page - 1) * BOOKS_PER_PAGE)).all()
+    return BookPage(
+        items=[_book_dict(bk, float(avg), count) for bk, avg, count in rows],
+        page=page,
+        total=total,
     )
 
-    books = []
-    for bk in Book.query.all():
-        built = _ol_cover_url(
-            cover_i=str(bk.cover_i or ""),
-            isbn=str(bk.isbn or ""),
-            olid=str(bk.olid or ""),
-        )
-        books.append({
-            "id": bk.id,
-            "title": bk.title,
-            "author": bk.author,
-            "genre": bk.genre or "Other",
-            "year": bk.year or "",
-            "cover": built or safe_cover_url(bk.cover) or PLACEHOLDER_COVER,
-            "rating": float(avg_by_book.get(bk.id) or 0.0),
-        })
-    return books
+
+def ratings_for(book_ids) -> dict:
+    """{book id: (average rating, review count)} for the given books, in one query."""
+    if not book_ids:
+        return {}
+    rows = db.session.execute(
+        db.select(Review.book_id, func.avg(Review.rating), func.count(Review.id))
+        .where(Review.book_id.in_(book_ids))
+        .group_by(Review.book_id)
+    ).all()
+    return {book_id: (float(avg), count) for book_id, avg, count in rows}
+
+
+def _page_number() -> int:
+    try:
+        return int(request.args.get("page", 1))
+    except ValueError:
+        return 1
 
 
 def _time_ago(dt: datetime) -> str:
@@ -471,8 +539,7 @@ def _time_ago(dt: datetime) -> str:
     return f"{years}y ago"
 
 
-@lru_cache(maxsize=1024)
-def _ol_description_for(title: str, author: str = "", timeout: int = 4) -> str:
+def _ol_description_for(title: str, author: str = "", timeout: int = 4) -> str | None:
     """
     Best-effort description from Open Library.
     Uses search -> first work -> work details.
@@ -491,7 +558,7 @@ def _ol_description_for(title: str, author: str = "", timeout: int = 4) -> str:
         with urlopen(req, timeout=timeout) as resp:
             data = json.loads(resp.read().decode("utf-8"))
     except Exception:
-        return ""
+        return None  # network problem: try again next time
 
     docs = data.get("docs") or []
     if not docs:
@@ -546,7 +613,7 @@ def _ol_description_for(title: str, author: str = "", timeout: int = 4) -> str:
         with urlopen(req2, timeout=timeout) as resp:
             work = json.loads(resp.read().decode("utf-8"))
     except Exception:
-        return ""
+        return None  # network problem: try again next time
 
     desc = work.get("description")
     if isinstance(desc, dict):
@@ -561,150 +628,70 @@ def _ol_description_for(title: str, author: str = "", timeout: int = 4) -> str:
     return ""
 
 # -----------------------------------------------------------------------------
-# Bulk seeding helper (Open Library) + curated search terms
+# Seeding the catalogue
 # -----------------------------------------------------------------------------
-def _ol_search(term: str, limit: int = 50, page: int = 1):
-    """
-    Search Open Library and return list of dicts:
-      {title, author, year, cover, cover_i, isbn, olid}
-    """
-    url = f"https://openlibrary.org/search.json?q={quote(term)}&limit={limit}&page={page}"
-    req = Request(url, headers={"User-Agent": "BookBuddy/1.0 (personal project)"})
-
-    with urlopen(req, timeout=20) as resp:
-        data = json.loads(resp.read().decode("utf-8"))
-
-    results = []
-    for d in (data.get("docs") or []):
-        title = (d.get("title") or "").strip()
-
-        author = ""
-        if isinstance(d.get("author_name"), list) and d["author_name"]:
-            author = (d["author_name"][0] or "").strip()
-
-        year = ""
-        if isinstance(d.get("first_publish_year"), int):
-            year = str(d["first_publish_year"])
-
-        cover_i = str(d.get("cover_i") or "").strip()
-
-        isbn = ""
-        isbns = d.get("isbn")
-        if isinstance(isbns, list) and isbns:
-            isbn = str(isbns[0] or "").strip()
-
-        olid = ""
-        edition_keys = d.get("edition_key")
-        if isinstance(edition_keys, list) and edition_keys:
-            olid = str(edition_keys[0] or "").strip()
-
-        cover = _ol_cover_url(cover_i=cover_i, isbn=isbn, olid=olid)
-
-        if title and author:
-            results.append({
-                "title": title,
-                "author": author,
-                "year": year,
-                "cover": cover,
-                "cover_i": cover_i,
-                "isbn": isbn,
-                "olid": olid,
-            })
-
-    return results
+SEED_FILE = os.path.join(app.root_path, "data", "books.csv")
 
 
-# ---------------------------------------------------------------------
-# Curated shelves (seed by title/author, not broad search terms)
-# ---------------------------------------------------------------------
-CURATED_SHELVES = {
-    "Classics": [
-        ("Pride and Prejudice", "Jane Austen", "Classics"),
-        ("Wuthering Heights", "Emily Brontë", "Classics"),
-        ("Jane Eyre", "Charlotte Brontë", "Classics"),
-        ("Great Expectations", "Charles Dickens", "Classics"),
-        ("The Great Gatsby", "F. Scott Fitzgerald", "Classics"),
-        ("Crime and Punishment", "Fyodor Dostoevsky", "Classics"),
-        ("Frankenstein", "Mary Shelley", "Classics"),
-        ("Dracula", "Bram Stoker", "Classics"),
-        ("The Picture of Dorian Gray", "Oscar Wilde", "Classics"),
-        ("1984", "George Orwell", "Classics"),
-        ("Brave New World", "Aldous Huxley", "Classics"),
-    ],
-    "Cult favourites": [
-        ("The Secret History", "Donna Tartt", "Literary"),
-        ("Fight Club", "Chuck Palahniuk", "Literary"),
-        ("American Psycho", "Bret Easton Ellis", "Literary"),
-        ("The Handmaid's Tale", "Margaret Atwood", "Dystopian"),
-        ("The Bell Jar", "Sylvia Plath", "Literary"),
-        ("The Road", "Cormac McCarthy", "Literary"),
-        ("Gone Girl", "Gillian Flynn", "Mystery"),
-        ("The Shining", "Stephen King", "Horror"),
-    ],
-    "Trending": [
-        
-        ("Fourth Wing", "Rebecca Yarros", "Fantasy"),
-        ("Iron Flame", "Rebecca Yarros", "Fantasy"),
-        ("The Seven Husbands of Evelyn Hugo", "Taylor Jenkins Reid", "Romance"),
-        ("The Song of Achilles", "Madeline Miller", "Fantasy"),
-        ("It Ends with Us", "Colleen Hoover", "Romance"),
-        ("The Silent Patient", "Alex Michaelides", "Mystery"),
-    ],
-}
-
-
-
-def _ensure_seeded_curated(min_books: int = 250):
-    ...
-    """
-    Seed DB using curated title/author lists (stable, portfolio-friendly).
-    Keeps going until we have at least min_total books in DB.
-    """
-    current_count = Book.query.count()
-    if current_count >= min_books:
-        return
-
-    for shelf, items in CURATED_SHELVES.items():
-        for title, author, genre in items:
-            title = (title or "").strip()
-            author = (author or "").strip()
-            genre = (genre or "Other").strip()
-
-            if not title or not author:
-                continue
-
-            if Book.query.filter_by(title=title, author=author).first():
-                continue
-
-            meta = _ol_best_match(title, author) or {}
-            cover = (meta.get("cover") or "").strip() or PLACEHOLDER_COVER
-
-            b = Book(
-                title=title,
-                author=author,
-                genre=genre,
-                year=(meta.get("year") or "").strip(),
-                cover=cover,
-                olid=(meta.get("olid") or "").strip(),
-                cover_i=(meta.get("cover_i") or "").strip(),
-                isbn=(meta.get("isbn") or "").strip(),
-            )
-            db.session.add(b)
-
-    db.session.commit()
-
+def _is_referenced(book_id: int) -> bool:
+    """True if any review, favourite or history entry points at this book."""
+    return any(
+        model.query.filter_by(book_id=book_id).first() is not None
+        for model in (Review, Favourite, History)
+    )
 
 
 @app.cli.command("seed")
-def seed_command() -> None:
-    """Add the curated starter books. Needs an internet connection.
+@click.option("--reset", is_flag=True,
+              help="Also delete books that aren't in data/books.csv and that nobody has used.")
+def seed_command(reset: bool) -> None:
+    """Load the curated books in data/books.csv. Needs an internet connection.
 
-    This used to run every time main.py was imported, which made start-up
-    wait on Open Library and broke `flask db` commands on an empty database.
-    Run it once with:  flask --app main seed
+    Run with:  flask --app main seed            (add missing books)
+               flask --app main seed --reset    (also clear out other unused books)
     """
-    _ensure_seeded_curated(min_books=250)
-    print(f"The catalogue now has {Book.query.count()} books.")
+    with open(SEED_FILE, newline="", encoding="utf-8") as f:
+        curated = [(r["title"].strip(), r["author"].strip(), r["genre"].strip()) for r in csv.DictReader(f)]
+    curated_keys = {(title, author) for title, author, _ in curated}
+
+    if reset:
+        unused = [
+            b for b in Book.query.all()
+            if (b.title, b.author) not in curated_keys and not _is_referenced(b.id)
+        ]
+        click.confirm(f"Delete {len(unused)} books that aren't curated and nobody has used?", abort=True)
+        for b in unused:
+            db.session.delete(b)
+        db.session.commit()
+        click.echo(f"Deleted {len(unused)} unused books.")
+
+    added = updated = 0
+    for i, (title, author, genre) in enumerate(curated, start=1):
+        existing = Book.query.filter_by(title=title, author=author).first()
+        if existing:
+            if existing.genre != genre:
+                existing.genre = genre  # fix genres from the old seeding
+                updated += 1
+            continue
+
+        meta = _ol_best_match(title, author) or {}
+        db.session.add(Book(
+            title=title,
+            author=author,
+            genre=genre,
+            year=(meta.get("year") or "").strip(),
+            cover=safe_cover_url(meta.get("cover")) or PLACEHOLDER_COVER,
+            olid=(meta.get("olid") or "").strip(),
+            cover_i=(meta.get("cover_i") or "").strip(),
+            isbn=(meta.get("isbn") or "").strip(),
+        ))
+        added += 1
+        click.echo(f"[{i}/{len(curated)}] {title}")
+        db.session.commit()  # save as we go, so a dropped connection loses nothing
+
+    db.session.commit()
+    click.echo(f"Added {added} books, fixed the genre of {updated}. "
+               f"The catalogue now has {Book.query.count()} books.")
 
 
 # -----------------------------------------------------------------------------
@@ -712,10 +699,11 @@ def seed_command() -> None:
 # -----------------------------------------------------------------------------
 @app.route("/")
 def home():
-    # Use combined list so homepage benefits from seeded DB too
-    books = all_books_ui()
-    featured = books[0] if books else {}
-    top_rated = sorted(books, key=lambda b: b.get("rating", 0.0), reverse=True)[:6]
+    # Only books people have actually rated appear under "Top Rated".
+    rows = db.session.execute(books_with_ratings(rated_only=True).limit(6)).all()
+    top_rated = [_book_dict(bk, float(avg), count) for bk, avg, count in rows]
+    first_book = db.session.scalar(db.select(Book).order_by(Book.title).limit(1))
+    featured = top_rated[0] if top_rated else (_book_dict(first_book, 0.0) if first_book else {})
     return render_template(
         "index.html",
         featured=featured,
@@ -727,23 +715,18 @@ def home():
 @app.route("/browse")
 def browse():
     genre = (request.args.get("genre") or "").strip()
-    q = (request.args.get("q") or "").strip().lower()
+    q = (request.args.get("q") or "").strip()
+    sort = request.args.get("sort") if request.args.get("sort") in SORT_OPTIONS else "rating"
 
-    books = all_books_ui()
-
-    if genre:
-        books = [b for b in books if (b.get("genre") or "").lower() == genre.lower()]
-    if q:
-        books = [
-            b for b in books
-            if q in (b.get("title") or "").lower() or q in (b.get("author") or "").lower()
-        ]
-
+    results = paginate_books(books_with_ratings(q=q, genre=genre, sort=sort), _page_number())
     return render_template(
         "browse.html",
-        books=books,
+        books=results.items,
+        results=results,
         genres=GENRES,
-        selected_genre=genre
+        selected_genre=genre,
+        sort=sort,
+        sort_options=SORT_OPTIONS,
     )
 
 
@@ -754,7 +737,7 @@ def _display_name(user) -> str:
     return (user.handle or user.name or "").strip() or "reader"
 
 
-def _book_dict(bk: Book, avg_rating: float) -> dict:
+def _book_dict(bk: Book, avg_rating: float, review_count: int = 0) -> dict:
     """The shape the templates expect for one book."""
     built = _ol_cover_url(cover_i=str(bk.cover_i or ""), isbn=str(bk.isbn or ""), olid=str(bk.olid or ""))
     return {
@@ -765,6 +748,7 @@ def _book_dict(bk: Book, avg_rating: float) -> dict:
         "year": bk.year or "",
         "cover": built or safe_cover_url(bk.cover) or PLACEHOLDER_COVER,
         "rating": avg_rating,
+        "review_count": review_count,
     }
 
 
@@ -806,8 +790,14 @@ def book_details(book_id):
         for r in latest_reviews
     ]
 
-    # Shown only when Open Library has one. The old made-up fallback text is gone.
-    description = _ol_description_for(bk.title, bk.author)
+    # Fetched from Open Library once, then kept in the database.
+    # Shown only when Open Library has one (the old made-up fallback text is gone).
+    if bk.description is None:
+        fetched = _ol_description_for(bk.title, bk.author)
+        if fetched is not None:          # None means Open Library couldn't be reached
+            bk.description = fetched     # may be "" if it has no description
+            db.session.commit()
+    description = bk.description or ""
 
     return render_template(
         "book_details.html",
@@ -886,7 +876,7 @@ def add_review():
         flash("Thanks for your review!", "ok")
         return redirect(url_for("book_details", book_id=bk.id))
 
-    return render_template("add_review.html", books=all_books_ui())
+    return render_template("add_review.html")
 
 
 @app.route("/add-book", methods=["GET", "POST"])
@@ -943,6 +933,7 @@ def favourites():
         .all()
     )
 
+    ratings = ratings_for([b.id for b in rows])
     books = []
     for b in rows:
         if q and (q not in (b.title or "").lower()) and (q not in (b.author or "").lower()):
@@ -952,7 +943,8 @@ def favourites():
             "title": b.title,
             "author": b.author,
             "cover": b.cover or PLACEHOLDER_COVER,
-            "rating": 0.0,
+            "rating": ratings.get(b.id, (0.0, 0))[0],
+            "review_count": ratings.get(b.id, (0.0, 0))[1],
         })
 
     return render_template("favourites.html", books=books, q=q)
@@ -996,6 +988,7 @@ def history():
         .all()
     )
 
+    ratings = ratings_for([b.id for b, _ in rows])
     books = []
     for b, viewed_at in rows:
         if q and (q not in (b.title or "").lower()) and (q not in (b.author or "").lower()):
@@ -1006,7 +999,8 @@ def history():
             "author": b.author,
             "cover": b.cover or PLACEHOLDER_COVER,
             "viewed_at": viewed_at,
-            "rating": 0.0,
+            "rating": ratings.get(b.id, (0.0, 0))[0],
+            "review_count": ratings.get(b.id, (0.0, 0))[1],
         })
 
     return render_template("history.html", books=books, q=q)
@@ -1033,11 +1027,9 @@ def api_history_add():
 
 @app.route("/top-rated")
 def top_rated():
-    q = (request.args.get("q") or "").strip().lower()
-    books = sorted(all_books_ui(), key=lambda b: b.get("rating", 0.0), reverse=True)
-    if q:
-        books = [b for b in books if q in (b.get("title","").lower()) or q in (b.get("author","").lower())]
-    return render_template("top_rated.html", books=books)
+    q = (request.args.get("q") or "").strip()
+    results = paginate_books(books_with_ratings(q=q, rated_only=True), _page_number())
+    return render_template("top_rated.html", books=results.items, results=results)
 
 
 
@@ -1420,27 +1412,12 @@ def language_settings():
 # -----------------------------------------------------------------------------
 @app.get("/api/search")
 def api_search_books():
-    q = (request.args.get("q") or "").strip().lower()
+    """Live search for the Add Review page: up to 8 matches, straight from the database."""
+    q = (request.args.get("q") or "").strip()
     if not q:
         return jsonify([])
-
-    books = all_books_ui()
-
-    def match(b):
-        return q in (b.get("title") or "").lower() or q in (b.get("author") or "").lower()
-
-    results = [
-        {
-            "id": b.get("id"),
-            "title": b.get("title", ""),
-            "author": b.get("author", ""),
-            "cover": b.get("cover", ""),
-            "rating": b.get("rating", 0),
-            "genre": b.get("genre", "")
-        }
-        for b in books if match(b)
-    ][:8]
-    return jsonify(results)
+    rows = db.session.execute(books_with_ratings(q=q, sort="title").limit(8)).all()
+    return jsonify([_book_dict(bk, float(avg), count) for bk, avg, count in rows])
 
 
 # -----------------------------------------------------------------------------

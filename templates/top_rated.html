@@ -165,17 +165,9 @@
     <input type="text" name="q" value="{{ (request.args.get('q') or '')|e }}" placeholder="Search" autocomplete="off">
   </form>
 
-  {# Filtered list #}
-  {% set filtered = [] %}
-  {% for b in books %}
-    {% if (not q) or (q in (b.title|lower)) or (q in (b.author|lower)) %}
-      {% set _ = filtered.append(b) %}
-    {% endif %}
-  {% endfor %}
-
-  {% if filtered and filtered|length %}
+  {% if books %}
     <div class="t-grid">
-      {% for b in filtered %}
+      {% for b in books %}
         <a class="t-tile" href="{{ url_for('book_details', book_id=b.id) }}">
           <img
             class="t-cover"
@@ -184,17 +176,29 @@
             onerror="this.onerror=null;this.src='https://placehold.co/400x600/EEE/AAA?text=No+Cover';"
           >
           <div class="t-meta">
-            <div class="t-rating">{{ '%.2f'|format(b.rating) }} avg rating</div>
+            <div class="t-rating">{% if b.review_count %}{{ '%.1f'|format(b.rating) }} ★ · {{ b.review_count }} review{{ '' if b.review_count == 1 else 's' }}{% else %}No reviews yet{% endif %}</div>
             <div class="t-title">{{ b.title }}</div>
             <div class="t-author">{{ b.author }}</div>
           </div>
         </a>
       {% endfor %}
     </div>
+
+  {% if results.pages > 1 %}
+    <nav aria-label="Pages" style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin:24px 0 8px; font-size:14px;">
+      {% if results.has_prev %}
+        <a class="button" href="{{ url_for(request.endpoint, **dict(request.args, page=results.page - 1)) }}" rel="prev">Previous</a>
+      {% else %}<span></span>{% endif %}
+      <span aria-current="page">Page {{ results.page }} of {{ results.pages }}</span>
+      {% if results.has_next %}
+        <a class="button" href="{{ url_for(request.endpoint, **dict(request.args, page=results.page + 1)) }}" rel="next">Next</a>
+      {% else %}<span></span>{% endif %}
+    </nav>
+  {% endif %}
   {% else %}
     <div class="empty">
-      <div class="t">No books found</div>
-      <div>Try a different search.</div>
+      <div class="t">{% if request.args.get('q') %}No rated books match that search{% else %}No ratings yet{% endif %}</div>
+      <div>Books appear here once readers have reviewed them.</div>
       <div style="margin-top:12px;">
         <a class="button" href="{{ url_for('top_rated') }}" style="height:40px;">Reset</a>
       </div>

@@ -23,9 +23,11 @@ depends_on = None
 def upgrade():
     conn = op.get_bind()
 
-    # 1. A place to store each user's profile picture path.
-    with op.batch_alter_table('user', schema=None) as batch_op:
-        batch_op.add_column(sa.Column('avatar', sa.String(length=255), nullable=True))
+    # 1. A place to store each user's profile picture path. (Skipped if an
+    #    earlier, interrupted run of this migration already added it.)
+    existing = {col["name"] for col in sa.inspect(conn).get_columns("user")}
+    if "avatar" not in existing:
+        op.add_column('user', sa.Column('avatar', sa.String(length=255), nullable=True))
 
     # "user" is quoted because it is a reserved word in PostgreSQL.
     # 2. An empty handle means "not chosen yet": store it as NULL, which the
@@ -54,13 +56,16 @@ def upgrade():
                 {"h": new_handle, "id": user_id},
             )
 
-    # 4. Switch the rule on.
-    with op.batch_alter_table('user', schema=None) as batch_op:
-        batch_op.create_unique_constraint('uq_user_handle', ['handle'])
+    # 4. Switch the rule on with a unique index. (A unique *constraint* would
+    #    make SQLite rebuild the whole user table, which it refuses to do while
+    #    reviews, favourites and history point at it. An index needs no rebuild
+    #    and enforces exactly the same rule, in SQLite and PostgreSQL.)
+    op.create_index('uq_user_handle', 'user', ['handle'], unique=True)
 
 
 def downgrade():
-    with op.batch_alter_table('user', schema=None) as batch_op:
-        batch_op.drop_constraint('uq_user_handle', type_='unique')
+    op.drop_index('uq_user_handle', table_name='user')
+    # recreate="never": drop the column in place instead of rebuilding the table.
+    with op.batch_alter_table('user', schema=None, recreate='never') as batch_op:
         batch_op.drop_column('avatar')
     # Renamed handles are not changed back: the old duplicate can't be restored safely.

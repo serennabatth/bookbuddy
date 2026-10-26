@@ -1,0 +1,221 @@
+title,author,genre
+Pride and Prejudice,Jane Austen,Romance
+Persuasion,Jane Austen,Romance
+Emma,Jane Austen,Romance
+Sense and Sensibility,Jane Austen,Romance
+North and South,Elizabeth Gaskell,Romance
+Love in the Time of Cholera,Gabriel García Márquez,Romance
+Outlander,Diana Gabaldon,Romance
+The Notebook,Nicholas Sparks,Romance
+Me Before You,Jojo Moyes,Romance
+Normal People,Sally Rooney,Romance
+The Seven Husbands of Evelyn Hugo,Taylor Jenkins Reid,Romance
+It Ends with Us,Colleen Hoover,Romance
+Beach Read,Emily Henry,Romance
+People We Meet on Vacation,Emily Henry,Romance
+The Hating Game,Sally Thorne,Romance
+"Red, White & Royal Blue",Casey McQuiston,Romance
+The Time Traveler's Wife,Audrey Niffenegger,Romance
+One Day,David Nicholls,Romance
+The Duke and I,Julia Quinn,Romance
+The Kiss Quotient,Helen Hoang,Romance
+The Hobbit,J.R.R. Tolkien,Fantasy
+The Fellowship of the Ring,J.R.R. Tolkien,Fantasy
+A Game of Thrones,George R.R. Martin,Fantasy
+The Name of the Wind,Patrick Rothfuss,Fantasy
+Mistborn: The Final Empire,Brandon Sanderson,Fantasy
+The Way of Kings,Brandon Sanderson,Fantasy
+Harry Potter and the Philosopher's Stone,J.K. Rowling,Fantasy
+A Wizard of Earthsea,Ursula K. Le Guin,Fantasy
+"The Lion, the Witch and the Wardrobe",C.S. Lewis,Fantasy
+The Song of Achilles,Madeline Miller,Fantasy
+Circe,Madeline Miller,Fantasy
+Fourth Wing,Rebecca Yarros,Fantasy
+A Court of Thorns and Roses,Sarah J. Maas,Fantasy
+The Priory of the Orange Tree,Samantha Shannon,Fantasy
+Jonathan Strange & Mr Norrell,Susanna Clarke,Fantasy
+Piranesi,Susanna Clarke,Fantasy
+The Night Circus,Erin Morgenstern,Fantasy
+American Gods,Neil Gaiman,Fantasy
+The Colour of Magic,Terry Pratchett,Fantasy
+Six of Crows,Leigh Bardugo,Fantasy
+Frankenstein,Mary Shelley,Horror
+The Shining,Stephen King,Horror
+It,Stephen King,Horror
+Carrie,Stephen King,Horror
+Pet Sematary,Stephen King,Horror
+Misery,Stephen King,Horror
+The Haunting of Hill House,Shirley Jackson,Horror
+We Have Always Lived in the Castle,Shirley Jackson,Horror
+The Exorcist,William Peter Blatty,Horror
+Rosemary's Baby,Ira Levin,Horror
+Bird Box,Josh Malerman,Horror
+Mexican Gothic,Silvia Moreno-Garcia,Horror
+House of Leaves,Mark Z. Danielewski,Horror
+The Silence of the Lambs,Thomas Harris,Horror
+Interview with the Vampire,Anne Rice,Horror
+I Am Legend,Richard Matheson,Horror
+Hell House,Richard Matheson,Horror
+Ghost Story,Peter Straub,Horror
+The Woman in Black,Susan Hill,Horror
+Coraline,Neil Gaiman,Horror
+The Hound of the Baskervilles,Arthur Conan Doyle,Mystery
+A Study in Scarlet,Arthur Conan Doyle,Mystery
+Murder on the Orient Express,Agatha Christie,Mystery
+And Then There Were None,Agatha Christie,Mystery
+The Murder of Roger Ackroyd,Agatha Christie,Mystery
+The Woman in White,Wilkie Collins,Mystery
+The Moonstone,Wilkie Collins,Mystery
+The Big Sleep,Raymond Chandler,Mystery
+The Maltese Falcon,Dashiell Hammett,Mystery
+The Name of the Rose,Umberto Eco,Mystery
+Gone Girl,Gillian Flynn,Mystery
+The Girl with the Dragon Tattoo,Stieg Larsson,Mystery
+The Silent Patient,Alex Michaelides,Mystery
+The Girl on the Train,Paula Hawkins,Mystery
+Big Little Lies,Liane Moriarty,Mystery
+The Da Vinci Code,Dan Brown,Mystery
+In the Woods,Tana French,Mystery
+The Thursday Murder Club,Richard Osman,Mystery
+The No. 1 Ladies' Detective Agency,Alexander McCall Smith,Mystery
+Magpie Murders,Anthony Horowitz,Mystery
+Sapiens,Yuval Noah Harari,Non-fiction
+Educated,Tara Westover,Non-fiction
+Becoming,Michelle Obama,Non-fiction
+"Thinking, Fast and Slow",Daniel Kahneman,Non-fiction
+Atomic Habits,James Clear,Non-fiction
+Quiet,Susan Cain,Non-fiction
+The Diary of a Young Girl,Anne Frank,Non-fiction
+In Cold Blood,Truman Capote,Non-fiction
+A Brief History of Time,Stephen Hawking,Non-fiction
+The Immortal Life of Henrietta Lacks,Rebecca Skloot,Non-fiction
+Born a Crime,Trevor Noah,Non-fiction
+Silent Spring,Rachel Carson,Non-fiction
+Freakonomics,Steven D. Levitt,Non-fiction
+Outliers,Malcolm Gladwell,Non-fiction
+The Code Breaker,Walter Isaacson,Non-fiction
+Steve Jobs,Walter Isaacson,Non-fiction
+Bad Blood,John Carreyrou,Non-fiction
+Invisible Women,Caroline Criado Perez,Non-fiction
+Clean Code,Robert C. Martin,Non-fiction
+The Pragmatic Programmer,Andrew Hunt,Non-fiction
+Dune,Frank Herbert,Sci-Fi
+Foundation,Isaac Asimov,Sci-Fi
+"I, Robot",Isaac Asimov,Sci-Fi
+Neuromancer,William Gibson,Sci-Fi
+The Left Hand of Darkness,Ursula K. Le Guin,Sci-Fi
+Do Androids Dream of Electric Sheep?,Philip K. Dick,Sci-Fi
+The Hitchhiker's Guide to the Galaxy,Douglas Adams,Sci-Fi
+Ender's Game,Orson Scott Card,Sci-Fi
+The Martian,Andy Weir,Sci-Fi
+Project Hail Mary,Andy Weir,Sci-Fi
+Hyperion,Dan Simmons,Sci-Fi
+The Three-Body Problem,Liu Cixin,Sci-Fi
+Children of Time,Adrian Tchaikovsky,Sci-Fi
+Klara and the Sun,Kazuo Ishiguro,Sci-Fi
+The War of the Worlds,H.G. Wells,Sci-Fi
+The Time Machine,H.G. Wells,Sci-Fi
+Slaughterhouse-Five,Kurt Vonnegut,Sci-Fi
+Snow Crash,Neal Stephenson,Sci-Fi
+Red Mars,Kim Stanley Robinson,Sci-Fi
+Kindred,Octavia E. Butler,Sci-Fi
+Great Expectations,Charles Dickens,Classics
+A Tale of Two Cities,Charles Dickens,Classics
+Oliver Twist,Charles Dickens,Classics
+Middlemarch,George Eliot,Classics
+War and Peace,Leo Tolstoy,Classics
+Anna Karenina,Leo Tolstoy,Classics
+Crime and Punishment,Fyodor Dostoevsky,Classics
+The Brothers Karamazov,Fyodor Dostoevsky,Classics
+Les Misérables,Victor Hugo,Classics
+Madame Bovary,Gustave Flaubert,Classics
+The Great Gatsby,F. Scott Fitzgerald,Classics
+To Kill a Mockingbird,Harper Lee,Classics
+Of Mice and Men,John Steinbeck,Classics
+The Grapes of Wrath,John Steinbeck,Classics
+Don Quixote,Miguel de Cervantes,Classics
+The Odyssey,Homer,Classics
+Little Women,Louisa May Alcott,Classics
+The Catcher in the Rye,J.D. Salinger,Classics
+The Old Man and the Sea,Ernest Hemingway,Classics
+Heart of Darkness,Joseph Conrad,Classics
+1984,George Orwell,Dystopian
+Brave New World,Aldous Huxley,Dystopian
+Fahrenheit 451,Ray Bradbury,Dystopian
+The Handmaid's Tale,Margaret Atwood,Dystopian
+The Testaments,Margaret Atwood,Dystopian
+Oryx and Crake,Margaret Atwood,Dystopian
+Animal Farm,George Orwell,Dystopian
+We,Yevgeny Zamyatin,Dystopian
+A Clockwork Orange,Anthony Burgess,Dystopian
+Lord of the Flies,William Golding,Dystopian
+The Children of Men,P.D. James,Dystopian
+The Hunger Games,Suzanne Collins,Dystopian
+Divergent,Veronica Roth,Dystopian
+The Maze Runner,James Dashner,Dystopian
+The Giver,Lois Lowry,Dystopian
+Never Let Me Go,Kazuo Ishiguro,Dystopian
+The Road,Cormac McCarthy,Dystopian
+Station Eleven,Emily St. John Mandel,Dystopian
+Parable of the Sower,Octavia E. Butler,Dystopian
+The Power,Naomi Alderman,Dystopian
+Dracula,Bram Stoker,Gothic
+Jane Eyre,Charlotte Brontë,Gothic
+Wuthering Heights,Emily Brontë,Gothic
+Rebecca,Daphne du Maurier,Gothic
+The Picture of Dorian Gray,Oscar Wilde,Gothic
+The Strange Case of Dr Jekyll and Mr Hyde,Robert Louis Stevenson,Gothic
+The Turn of the Screw,Henry James,Gothic
+The Castle of Otranto,Horace Walpole,Gothic
+The Mysteries of Udolpho,Ann Radcliffe,Gothic
+Northanger Abbey,Jane Austen,Gothic
+The Fall of the House of Usher,Edgar Allan Poe,Gothic
+Carmilla,Sheridan Le Fanu,Gothic
+The Phantom of the Opera,Gaston Leroux,Gothic
+The Monk,Matthew Lewis,Gothic
+The Yellow Wallpaper,Charlotte Perkins Gilman,Gothic
+Wide Sargasso Sea,Jean Rhys,Gothic
+The Thirteenth Tale,Diane Setterfield,Gothic
+The Little Stranger,Sarah Waters,Gothic
+Fingersmith,Sarah Waters,Gothic
+Melmoth the Wanderer,Charles Maturin,Gothic
+The Bell Jar,Sylvia Plath,Literary
+The Secret History,Donna Tartt,Literary
+The Goldfinch,Donna Tartt,Literary
+Beloved,Toni Morrison,Literary
+The Bluest Eye,Toni Morrison,Literary
+One Hundred Years of Solitude,Gabriel García Márquez,Literary
+The Remains of the Day,Kazuo Ishiguro,Literary
+Atonement,Ian McEwan,Literary
+The Kite Runner,Khaled Hosseini,Literary
+A Little Life,Hanya Yanagihara,Literary
+The God of Small Things,Arundhati Roy,Literary
+Mrs Dalloway,Virginia Woolf,Literary
+To the Lighthouse,Virginia Woolf,Literary
+The Book Thief,Markus Zusak,Literary
+Life of Pi,Yann Martel,Literary
+The Color Purple,Alice Walker,Literary
+Things Fall Apart,Chinua Achebe,Literary
+Wolf Hall,Hilary Mantel,Literary
+Americanah,Chimamanda Ngozi Adichie,Literary
+Stoner,John Williams,Literary
+Treasure Island,Robert Louis Stevenson,Adventure
+Kidnapped,Robert Louis Stevenson,Adventure
+The Count of Monte Cristo,Alexandre Dumas,Adventure
+The Three Musketeers,Alexandre Dumas,Adventure
+Around the World in Eighty Days,Jules Verne,Adventure
+Twenty Thousand Leagues Under the Seas,Jules Verne,Adventure
+Journey to the Centre of the Earth,Jules Verne,Adventure
+Robinson Crusoe,Daniel Defoe,Adventure
+Gulliver's Travels,Jonathan Swift,Adventure
+The Call of the Wild,Jack London,Adventure
+White Fang,Jack London,Adventure
+Moby-Dick,Herman Melville,Adventure
+King Solomon's Mines,H. Rider Haggard,Adventure
+The Lost World,Arthur Conan Doyle,Adventure
+The Adventures of Huckleberry Finn,Mark Twain,Adventure
+The Jungle Book,Rudyard Kipling,Adventure
+The Swiss Family Robinson,Johann David Wyss,Adventure
+The Princess Bride,William Goldman,Adventure
+Shōgun,James Clavell,Adventure
+Hatchet,Gary Paulsen,Adventure

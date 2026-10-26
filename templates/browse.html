@@ -213,17 +213,25 @@
     {% endfor %}
   </div>
 
-  {# Optional: server-side filter same style as favourites #}
-  {% set filtered = [] %}
-  {% for b in books %}
-    {% if (not ql) or (ql in (b.title|lower)) or (ql in (b.author|lower)) %}
-      {% set _ = filtered.append(b) %}
-    {% endif %}
-  {% endfor %}
+  <!-- count + sort (the database does the filtering and sorting) -->
+  <form method="get" action="{{ url_for('browse') }}"
+        style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin:12px 0; font-size:14px;">
+    <span aria-live="polite">{{ results.total }} book{{ '' if results.total == 1 else 's' }}</span>
+    {% if request.args.get('q') %}<input type="hidden" name="q" value="{{ request.args.get('q') }}">{% endif %}
+    {% if selected_genre %}<input type="hidden" name="genre" value="{{ selected_genre }}">{% endif %}
+    <label style="display:flex; align-items:center; gap:6px;">Sort
+      <select name="sort" onchange="this.form.submit()" style="height:36px; border-radius:8px; padding:0 8px;">
+        {% for key, label in sort_options.items() %}
+          <option value="{{ key }}" {% if key == sort %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <noscript><button type="submit">Apply</button></noscript>
+  </form>
 
-  {% if filtered and filtered|length %}
+  {% if books %}
     <div class="f-grid">
-      {% for b in filtered %}
+      {% for b in books %}
         <a class="f-tile" href="{{ url_for('book_details', book_id=b.id) }}">
           <img
             class="f-cover"
@@ -232,13 +240,25 @@
             onerror="this.onerror=null;this.src='https://placehold.co/400x600/EEE/AAA?text=No+Cover';"
           >
           <div class="f-meta">
-            <div class="f-rating">{{ '%.2f'|format(b.get('rating', b.rating or 0)) }} avg rating</div>
+            <div class="f-rating">{% if b.review_count %}{{ '%.1f'|format(b.rating) }} ★ · {{ b.review_count }} review{{ '' if b.review_count == 1 else 's' }}{% else %}No reviews yet{% endif %}</div>
             <div class="f-title">{{ b.title }}</div>
             <div class="f-author">{{ b.author }}</div>
           </div>
         </a>
       {% endfor %}
     </div>
+
+  {% if results.pages > 1 %}
+    <nav aria-label="Pages" style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin:24px 0 8px; font-size:14px;">
+      {% if results.has_prev %}
+        <a class="button" href="{{ url_for(request.endpoint, **dict(request.args, page=results.page - 1)) }}" rel="prev">Previous</a>
+      {% else %}<span></span>{% endif %}
+      <span aria-current="page">Page {{ results.page }} of {{ results.pages }}</span>
+      {% if results.has_next %}
+        <a class="button" href="{{ url_for(request.endpoint, **dict(request.args, page=results.page + 1)) }}" rel="next">Next</a>
+      {% else %}<span></span>{% endif %}
+    </nav>
+  {% endif %}
   {% else %}
     <div class="empty">
       <div class="t">No books found</div>

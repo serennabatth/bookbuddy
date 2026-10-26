@@ -353,7 +353,7 @@
           onerror="this.onerror=null;this.src='https://placehold.co/400x600/EEE/AAA?text=No+Cover';"
         >
         <div class="meta">
-          <div class="rating">{{ '%.2f'|format(b.rating) }} avg rating</div>
+          <div class="rating">{% if b.review_count %}{{ '%.1f'|format(b.rating) }} ★ · {{ b.review_count }} review{{ '' if b.review_count == 1 else 's' }}{% else %}No reviews yet{% endif %}</div>
           <div class="title">{{ b.title }}</div>
           <div class="author">{{ b.author }}</div>
         </div>
