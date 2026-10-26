@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_reviews.html" import review_sort_form %}
 
 {% block appbar %}
   <a class="navicon" href="{{ url_for('books.book_details', book_id=book.id) }}" aria-label="Back">
@@ -37,6 +38,9 @@
     <div class="summary">
       {{ '%.2f'|format(avg_rating) }} avg rating • {{ review_count }} review{{ '' if review_count == 1 else 's' }}
     </div>
+    {% if review_count > 1 %}
+      <div style="margin-top:12px;">{{ review_sort_form(url_for('books.book_reviews', book_id=book.id), sort, sort_options) }}</div>
+    {% endif %}
   </div>
 
   {% if reviews and reviews|length %}

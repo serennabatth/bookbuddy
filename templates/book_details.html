@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "_cover.html" import book_cover %}
+{% from "_reviews.html" import review_sort_form %}
 {% set top_rated = top_rated | default([]) %}
 
 {% block appbar %}
@@ -98,9 +99,14 @@
     <p class="desc">{{ description }}</p>
   {% endif %}
 
-  <div class="section">
+  <div class="section" id="reviews">
     <div class="title">User reviews</div>
-    <a class="see" href="{{ url_for('books.book_reviews', book_id=book.id) }}">See all</a>
+    {% if review_count > 1 %}
+      {{ review_sort_form(url_for('books.book_details', book_id=book.id) ~ '#reviews', sort, sort_options) }}
+    {% endif %}
+    {% if review_count %}
+      <a class="see" href="{{ url_for('books.book_reviews', book_id=book.id, sort=sort) }}">See all {{ review_count }}</a>
+    {% endif %}
   </div>
 
   {% if reviews %}

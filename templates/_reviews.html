@@ -1,0 +1,17 @@
+{% macro review_sort_form(action, sort, sort_options) -%}
+{# GET form so the order is in the URL (?sort=highest) and can be bookmarked.
+   Changing the dropdown submits it; the button is for when JavaScript is off. #}
+<form class="review-sort" method="get" action="{{ action }}">
+  <label for="review-sort">Sort</label>
+  <select id="review-sort" name="sort" onchange="this.form.submit()">
+    {% for key, label in sort_options.items() %}
+      <option value="{{ key }}" {% if key == sort %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <noscript><button type="submit">Go</button></noscript>
+</form>
+<style>
+  .review-sort { display:flex; align-items:center; gap:8px; margin:0; font-size:13px; color:var(--text-2); }
+  .review-sort select { height:36px; border-radius:10px; border:1px solid var(--border); background:var(--card); color:var(--text); padding:0 8px; font-size:13px; }
+</style>
+{%- endmacro %}

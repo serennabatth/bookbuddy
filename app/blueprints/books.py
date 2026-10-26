@@ -55,6 +55,38 @@ def _time_ago(dt: datetime | None) -> str:
     return f"{years}y ago"
 
 
+REVIEW_SORTS = {"newest": "Newest", "highest": "Highest rated", "lowest": "Lowest rated"}
+
+
+def _review_sort() -> str:
+    sort = request.args.get("sort")
+    return sort if sort in REVIEW_SORTS else "newest"
+
+
+def _reviews_for(book_id: int, sort: str, limit: int | None = None) -> list[dict]:
+    """A book's reviews in the chosen order, ready for the templates."""
+    order = {
+        "newest": (Review.created.desc(), Review.id.desc()),
+        "highest": (Review.rating.desc(), Review.created.desc()),
+        "lowest": (Review.rating.asc(), Review.created.desc()),
+    }[sort]
+    query = Review.query.filter_by(book_id=book_id).order_by(*order)
+    if limit:
+        query = query.limit(limit)
+    viewer_id = current_user.id if current_user.is_authenticated else None
+    return [
+        {
+            "id": r.id,
+            "user": display_name(r.user),
+            "rating": r.rating,
+            "text": (r.text or "").strip(),
+            "age": _time_ago(r.created),
+            "is_mine": viewer_id is not None and r.user_id == viewer_id,
+        }
+        for r in query.all()
+    ]
+
+
 @bp.route("/")
 def home():
     # Top Rated only shows books that have reviews
@@ -106,25 +138,8 @@ def book_details_by_title(title):
 def book_details(book_id):
     bk = db.get_or_404(Book, book_id)
 
-    latest_reviews = (
-        Review.query
-        .filter_by(book_id=bk.id)
-        .order_by(Review.created.desc())
-        .limit(25)
-        .all()
-    )
+    sort = _review_sort()
     viewer_id = current_user.id if current_user.is_authenticated else None
-    reviews_for_template = [
-        {
-            "id": r.id,
-            "user": display_name(r.user),
-            "rating": r.rating,
-            "text": (r.text or "").strip(),
-            "age": _time_ago(r.created),
-            "is_mine": r.user_id == viewer_id,
-        }
-        for r in latest_reviews
-    ]
     my_review = (
         Review.query.filter_by(user_id=viewer_id, book_id=bk.id).first() if viewer_id else None
     )
@@ -143,7 +158,10 @@ def book_details(book_id):
         book=book_dict(bk, average_rating(bk.id)),
         book_id=bk.id,
         description=description,
-        reviews=reviews_for_template,
+        reviews=_reviews_for(bk.id, sort, limit=25),
+        review_count=Review.query.filter_by(book_id=bk.id).count(),
+        sort=sort,
+        sort_options=REVIEW_SORTS,
         my_review_id=my_review.id if my_review else None,
         shelf=my_shelf.status if my_shelf else None,
         shelf_options=PICKER_OPTIONS,
@@ -153,22 +171,16 @@ def book_details(book_id):
 @bp.route("/books/<int:book_id>/reviews")
 def book_reviews(book_id):
     bk = db.get_or_404(Book, book_id)
-    rows = Review.query.filter_by(book_id=bk.id).order_by(Review.created.desc()).all()
-    reviews = [
-        {
-            "user": display_name(r.user),
-            "rating": r.rating,
-            "text": (r.text or "").strip(),
-            "created": r.created,
-        }
-        for r in rows
-    ]
+    sort = _review_sort()
+    reviews = _reviews_for(bk.id, sort)
     return render_template(
         "book_reviews.html",
         book=book_dict(bk, average_rating(bk.id)),
         reviews=reviews,
         avg_rating=average_rating(bk.id),
-        review_count=len(rows),
+        review_count=len(reviews),
+        sort=sort,
+        sort_options=REVIEW_SORTS,
     )
 
 
