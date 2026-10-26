@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_cover.html" import book_cover %}
 
 {% block appbar %}
 <style>
@@ -193,12 +194,7 @@
     <div class="h-grid">
       {% for b in filtered %}
         <a class="h-tile" href="{{ url_for('book_details', book_id=b.id) }}">
-          <img
-            class="h-cover"
-            src="{{ b.cover }}"
-            alt="{{ b.title }}"
-            onerror="this.onerror=null;this.src='https://placehold.co/400x600/EEE/AAA?text=No+Cover';"
-          >
+          {{ book_cover(b) }}
           <div class="h-meta">
             <div class="h-rating">{% if b.review_count %}{{ '%.1f'|format(b.rating) }} ★ · {{ b.review_count }} review{{ '' if b.review_count == 1 else 's' }}{% else %}No reviews yet{% endif %}</div>
             <div class="h-title">{{ b.title }}</div>

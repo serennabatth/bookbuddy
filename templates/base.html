@@ -201,6 +201,33 @@ input::placeholder,textarea::placeholder{color:var(--text-2)}
   font-size: 14px;
 }
 
+/* =============================
+   Book covers (templates/_cover.html)
+   A book-shaped 2:3 frame. The coloured title tile always sits underneath;
+   real cover art, when there is some, is laid on top of it.
+   ============================= */
+.book-cover{
+  position:relative; width:100%; aspect-ratio:2 / 3;
+  border-radius:4px; overflow:hidden; background:#E6DFD1;
+  box-shadow:0 1px 2px rgba(28,26,23,.20), 0 6px 16px rgba(28,26,23,.10);
+}
+.book-cover-tile{
+  position:absolute; inset:0; display:flex; flex-direction:column; justify-content:space-between;
+  padding:14% 10%; color:#F3EDE4; text-align:left;
+}
+.book-cover-title{
+  font:600 18px/1.15 Georgia, "Times New Roman", serif; overflow-wrap:normal; hyphens:none;
+  display:-webkit-box; -webkit-line-clamp:5; -webkit-box-orient:vertical; overflow:hidden;
+}
+.book-cover-author{ font:600 9px/1.3 system-ui, sans-serif; letter-spacing:.1em; text-transform:uppercase; opacity:.85; }
+.book-cover.sm .book-cover-title{ font-size:13px; }
+.book-cover.sm .book-cover-author{ font-size:8px; }
+.book-cover-art{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block; }
+
+/* "Minimal" cover style: show the calm coloured tiles instead of cover art.
+   A book's own page ("art" variant) still shows its real cover. */
+.covers-minimal .book-cover:not(.art) .book-cover-art{ display:none; }
+
 /* Text clamping (global) */
 .clamp-1{
   overflow:hidden;
@@ -224,6 +251,18 @@ input::placeholder,textarea::placeholder{color:var(--text-2)}
   overflow:hidden;
 }
   </style>
+
+  <script>
+    // Cover style: real cover art (default) or calm coloured tiles ("minimal").
+    // Remembered in this browser only for now; it becomes a saved setting later.
+    (function () {
+      try {
+        if (localStorage.getItem('bb_covers') === 'minimal') {
+          document.documentElement.classList.add('covers-minimal');
+        }
+      } catch (e) {}
+    })();
+  </script>
 
   {% block head %}{% endblock %}
 </head>

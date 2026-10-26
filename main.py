@@ -318,102 +318,118 @@ def safe_cover_url(url: str) -> str:
 
 
 def _ol_cover_url(cover_i: str = "", isbn: str = "", olid: str = "") -> str:
-    """
-    Build the most reliable Open Library cover URL available.
-    Priority:
-      1) cover_i (best)
-      2) ISBN (often good)
-      3) OLID (edition id)
+    """Build an Open Library cover URL from the best identifier we have.
+
+    Priority: cover id, then ISBN, then edition id. "?default=false" makes
+    Open Library return an error instead of a blank 1x1 image when it has no
+    cover, so the page can show the title-and-author tile instead.
     """
     cover_i = (cover_i or "").strip()
     isbn = (isbn or "").strip()
     olid = (olid or "").strip()
 
     if cover_i:
-        return f"https://covers.openlibrary.org/b/id/{cover_i}-L.jpg"
+        return f"https://covers.openlibrary.org/b/id/{cover_i}-L.jpg?default=false"
     if isbn:
-        return f"https://covers.openlibrary.org/b/isbn/{isbn}-L.jpg"
+        return f"https://covers.openlibrary.org/b/isbn/{isbn}-L.jpg?default=false"
     if olid:
-        return f"https://covers.openlibrary.org/b/olid/{olid}-L.jpg"
+        return f"https://covers.openlibrary.org/b/olid/{olid}-L.jpg?default=false"
+    return ""
+
+
+def _ol_get_json(url: str, timeout: int = 15):
+    """GET a JSON document from Open Library, or None if anything goes wrong."""
+    req = Request(url, headers={"User-Agent": "BookBuddy/1.0 (personal project)"})
+    try:
+        with urlopen(req, timeout=timeout) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except Exception:
+        return None
+
+
+def _score_search_result(doc: dict, title: str, author: str) -> int:
+    """How well one Open Library search result matches the book we want.
+
+    Title and author matter most. After that, prefer English-language works
+    and works with many editions, which are usually the well-known version
+    rather than a translation or an obscure reprint.
+    """
+    t_low, a_low = title.strip().lower(), author.strip().lower()
+    score = 0
+
+    d_title = (doc.get("title") or "").strip().lower()
+    if d_title == t_low:
+        score += 50
+    elif t_low and t_low in d_title:
+        score += 25
+
+    authors = doc.get("author_name") or []
+    first_author = (authors[0] or "").strip().lower() if authors else ""
+    if a_low and first_author:
+        if first_author == a_low:
+            score += 50
+        elif a_low in first_author or first_author in a_low:
+            score += 25
+
+    if doc.get("cover_i"):
+        score += 10
+    if "eng" in (doc.get("language") or []):
+        score += 20
+    score += min(int(doc.get("edition_count") or 0), 100) // 5   # up to +20
+
+    return score
+
+
+def pick_best_search_result(docs: list, title: str, author: str = "") -> dict | None:
+    """The search result that best matches (title, author), or None if there are none."""
+    if not docs:
+        return None
+    return max(docs, key=lambda doc: _score_search_result(doc, title, author))
+
+
+def _english_edition_cover(work_key: str) -> str:
+    """The cover id of an English edition of this work, or "" if there isn't one.
+
+    A work's default cover is sometimes a translation's, e.g. a French
+    "Une brève histoire du temps" for A Brief History of Time.
+    """
+    if not (work_key or "").startswith("/works/"):
+        return ""
+    data = _ol_get_json(f"https://openlibrary.org{work_key}/editions.json?limit=100") or {}
+    for edition in data.get("entries") or []:
+        languages = {lang.get("key") for lang in edition.get("languages") or []}
+        covers = [c for c in edition.get("covers") or [] if isinstance(c, int) and c > 0]
+        if "/languages/eng" in languages and covers:
+            return str(covers[0])
     return ""
 
 
 def _ol_best_match(title: str, author: str = "", timeout: int = 15) -> dict:
-    """
-    Try to find the best Open Library match for (title, author).
-    Returns: {cover, cover_i, isbn, olid, year}
+    """Look a book up on Open Library.
+
+    Returns {cover, cover_i, isbn, olid, year}, or {} if nothing was found
+    or Open Library couldn't be reached.
     """
     t = (title or "").strip()
     a = (author or "").strip()
     if not t:
         return {}
 
-    # Query includes author to reduce wrong covers
+    fields = "key,title,author_name,cover_i,isbn,edition_key,first_publish_year,language,edition_count"
     q = t if not a else f"{t} {a}"
-    url = f"https://openlibrary.org/search.json?q={quote(q)}&limit=20&page=1"
-    req = Request(url, headers={"User-Agent": "BookBuddy/1.0 (personal project)"})
-
-    try:
-        with urlopen(req, timeout=timeout) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-    except Exception:
+    data = _ol_get_json(
+        f"https://openlibrary.org/search.json?q={quote(q)}&limit=20&fields={fields}", timeout=timeout
+    ) or {}
+    best = pick_best_search_result(data.get("docs") or [], t, a)
+    if best is None:
         return {}
 
-    docs = data.get("docs") or []
-    if not docs:
-        return {}
-
-    t_low = t.lower()
-    a_low = a.lower()
-
-    def score(doc: dict) -> int:
-        s = 0
-        d_title = (doc.get("title") or "").strip().lower()
-        if d_title == t_low:
-            s += 50
-        elif t_low and t_low in d_title:
-            s += 25
-
-        authors = doc.get("author_name")
-        first_author = ""
-        if isinstance(authors, list) and authors:
-            first_author = (authors[0] or "").strip().lower()
-
-        if a_low and first_author:
-            if first_author == a_low:
-                s += 50
-            elif a_low in first_author or first_author in a_low:
-                s += 25
-
-        if doc.get("cover_i"):
-            s += 10
-
-        isbns = doc.get("isbn")
-        if isinstance(isbns, list) and isbns:
-            s += 3
-
-        return s
-
-    best = max(docs, key=score)
-
-    cover_i = str(best.get("cover_i") or "").strip()
-
-    olid = ""
-    edition_keys = best.get("edition_key")
-    if isinstance(edition_keys, list) and edition_keys:
-        olid = str(edition_keys[0] or "").strip()
-
-    isbn = ""
-    isbns = best.get("isbn")
-    if isinstance(isbns, list) and isbns:
-        isbn = str(isbns[0] or "").strip()
-
-    year = ""
-    if isinstance(best.get("first_publish_year"), int):
-        year = str(best["first_publish_year"])
+    cover_i = _english_edition_cover(best.get("key") or "") or str(best.get("cover_i") or "").strip()
+    olid = str((best.get("edition_key") or [""])[0] or "").strip()
+    isbn = str((best.get("isbn") or [""])[0] or "").strip()
+    year = str(best["first_publish_year"]) if isinstance(best.get("first_publish_year"), int) else ""
 
     cover = _ol_cover_url(cover_i=cover_i, isbn=isbn, olid=olid)
-
     return {"cover": cover, "cover_i": cover_i, "isbn": isbn, "olid": olid, "year": year}
 
 
@@ -641,18 +657,45 @@ def _is_referenced(book_id: int) -> bool:
     )
 
 
+def _apply_metadata(book: Book, meta: dict) -> None:
+    """Copy Open Library details onto a book (keeping a year it already has)."""
+    book.year = book.year or (meta.get("year") or "").strip()
+    book.cover_i = (meta.get("cover_i") or "").strip()
+    book.isbn = (meta.get("isbn") or "").strip()
+    book.olid = (meta.get("olid") or "").strip()
+    book.cover = safe_cover_url(meta.get("cover")) or PLACEHOLDER_COVER
+
+
+def _metadata_for(title: str, author: str, cover_id: str = "") -> dict:
+    """Open Library details, with a hand-picked cover id from books.csv winning if given."""
+    meta = _ol_best_match(title, author) or {}
+    if cover_id:
+        meta["cover_i"] = cover_id
+        meta["cover"] = _ol_cover_url(cover_i=cover_id)
+    return meta
+
+
 @app.cli.command("seed")
 @click.option("--reset", is_flag=True,
               help="Also delete books that aren't in data/books.csv and that nobody has used.")
-def seed_command(reset: bool) -> None:
+@click.option("--refresh-covers", is_flag=True,
+              help="Look up covers again for curated books that are already saved.")
+def seed_command(reset: bool, refresh_covers: bool) -> None:
     """Load the curated books in data/books.csv. Needs an internet connection.
 
-    Run with:  flask --app main seed            (add missing books)
-               flask --app main seed --reset    (also clear out other unused books)
+    Run with:  flask --app main seed                   (add missing books)
+               flask --app main seed --reset           (also clear out other unused books)
+               flask --app main seed --refresh-covers  (re-fetch covers for saved books)
+
+    books.csv has an optional cover_id column: put an Open Library cover id
+    there to choose a book's cover by hand when the automatic match is wrong.
     """
     with open(SEED_FILE, newline="", encoding="utf-8") as f:
-        curated = [(r["title"].strip(), r["author"].strip(), r["genre"].strip()) for r in csv.DictReader(f)]
-    curated_keys = {(title, author) for title, author, _ in curated}
+        curated = [
+            (r["title"].strip(), r["author"].strip(), r["genre"].strip(), (r.get("cover_id") or "").strip())
+            for r in csv.DictReader(f)
+        ]
+    curated_keys = {(title, author) for title, author, _, _ in curated}
 
     if reset:
         unused = [
@@ -665,32 +708,27 @@ def seed_command(reset: bool) -> None:
         db.session.commit()
         click.echo(f"Deleted {len(unused)} unused books.")
 
-    added = updated = 0
-    for i, (title, author, genre) in enumerate(curated, start=1):
-        existing = Book.query.filter_by(title=title, author=author).first()
-        if existing:
-            if existing.genre != genre:
-                existing.genre = genre  # fix genres from the old seeding
-                updated += 1
-            continue
+    added = updated = refreshed = 0
+    for i, (title, author, genre, cover_id) in enumerate(curated, start=1):
+        book = Book.query.filter_by(title=title, author=author).first()
 
-        meta = _ol_best_match(title, author) or {}
-        db.session.add(Book(
-            title=title,
-            author=author,
-            genre=genre,
-            year=(meta.get("year") or "").strip(),
-            cover=safe_cover_url(meta.get("cover")) or PLACEHOLDER_COVER,
-            olid=(meta.get("olid") or "").strip(),
-            cover_i=(meta.get("cover_i") or "").strip(),
-            isbn=(meta.get("isbn") or "").strip(),
-        ))
-        added += 1
-        click.echo(f"[{i}/{len(curated)}] {title}")
+        if book is None:
+            book = Book(title=title, author=author, genre=genre)
+            _apply_metadata(book, _metadata_for(title, author, cover_id))
+            db.session.add(book)
+            added += 1
+            click.echo(f"[{i}/{len(curated)}] added {title}")
+        else:
+            if book.genre != genre:
+                book.genre = genre  # fix genres from the old seeding
+                updated += 1
+            if refresh_covers or (cover_id and book.cover_i != cover_id):
+                _apply_metadata(book, _metadata_for(title, author, cover_id))
+                refreshed += 1
+                click.echo(f"[{i}/{len(curated)}] new cover for {title}")
         db.session.commit()  # save as we go, so a dropped connection loses nothing
 
-    db.session.commit()
-    click.echo(f"Added {added} books, fixed the genre of {updated}. "
+    click.echo(f"Added {added} books, fixed the genre of {updated}, refreshed {refreshed} covers. "
                f"The catalogue now has {Book.query.count()} books.")
 
 

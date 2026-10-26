@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_cover.html" import book_cover %}
 {% set top_rated = top_rated | default([]) %}
 
 {% block appbar %}
@@ -15,8 +16,7 @@
   .wrap { max-width:420px; margin:0 auto; padding:16px 16px 112px; }
 
   .head { display:grid; grid-template-columns: 140px 1fr; gap:16px; align-items:start; }
-  .cover { width:140px; height:200px; border-radius:12px; overflow:hidden; box-shadow:var(--shadow); background:var(--card); border:1px solid var(--border); }
-  .cover img { width:100%; height:100%; object-fit:cover; display:block; }
+  .cover { width:140px; flex:none; }
 
   .meta .avg { font-size:12px; color:var(--text-2); margin-bottom:6px; }
   .meta .title { font-size:18px; line-height:1.25; margin:0 0 4px; }
@@ -44,18 +44,14 @@
 
   @media (max-width:380px){
     .head { grid-template-columns:120px 1fr; }
-    .cover { width:120px; height:180px; }
+    .cover { width:120px; }
   }
 </style>
 
 <div class="wrap">
   <div class="head">
     <div class="cover">
-      <img
-        src="{{ book.cover }}"
-        alt="{{ book.title }}"
-        onerror="this.onerror=null;this.src='https://placehold.co/400x600/EEE/AAA?text=No+Cover';"
-      >
+      {{ book_cover(book, "art") }}
     </div>
 
     <div class="meta">
