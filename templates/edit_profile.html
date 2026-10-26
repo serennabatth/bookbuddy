@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block appbar %}
-  <a class="navicon" href="{{ url_for('profile_page') }}" aria-label="Back">
+  <a class="navicon" href="{{ url_for('social.profile_page') }}" aria-label="Back">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <polyline points="15 18 9 12 15 6"></polyline>
     </svg>
@@ -172,7 +172,7 @@
 
   <form
     method="POST"
-    action="{{ url_for('edit_profile') }}"
+    action="{{ url_for('settings.edit_profile') }}"
     enctype="multipart/form-data"
   >
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -230,7 +230,7 @@
       >{{ user.bio }}</textarea>
     </div>
 
-    <a class="settings-link" href="{{ url_for('settings') }}">
+    <a class="settings-link" href="{{ url_for('settings.index') }}">
       Settings
       <span class="chev">›</span>
     </a>
@@ -239,7 +239,7 @@
     <div class="form-spacer"></div>
 
     <div class="actions">
-      <a class="btn-dark" href="{{ url_for('profile_page') }}"
+      <a class="btn-dark" href="{{ url_for('social.profile_page') }}"
          style="text-decoration:none; display:flex; align-items:center; justify-content:center;">
         Cancel Changes
       </a>

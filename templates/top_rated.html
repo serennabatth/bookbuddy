@@ -27,7 +27,7 @@
   .h1{ text-align:center; }
 </style>
 
-  <a class="navicon" href="{{ url_for('home') }}" aria-label="Back">
+  <a class="navicon" href="{{ url_for('books.home') }}" aria-label="Back">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <polyline points="15 18 9 12 15 6"></polyline>
     </svg>
@@ -158,7 +158,7 @@
   {% set q = (request.args.get('q') or '') | lower %}
 
   <!-- Search -->
-  <form class="t-search" action="{{ url_for('top_rated') }}" method="get">
+  <form class="t-search" action="{{ url_for('books.top_rated') }}" method="get">
     <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <circle cx="11" cy="11" r="7"></circle>
       <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
@@ -169,7 +169,7 @@
   {% if books %}
     <div class="t-grid">
       {% for b in books %}
-        <a class="t-tile" href="{{ url_for('book_details', book_id=b.id) }}">
+        <a class="t-tile" href="{{ url_for('books.book_details', book_id=b.id) }}">
           {{ book_cover(b) }}
           <div class="t-meta">
             <div class="t-rating">{% if b.review_count %}{{ '%.1f'|format(b.rating) }} ★ · {{ b.review_count }} review{{ '' if b.review_count == 1 else 's' }}{% else %}No reviews yet{% endif %}</div>
@@ -196,7 +196,7 @@
       <div class="t">{% if request.args.get('q') %}No rated books match that search{% else %}No ratings yet{% endif %}</div>
       <div>Books appear here once readers have reviewed them.</div>
       <div style="margin-top:12px;">
-        <a class="button" href="{{ url_for('top_rated') }}" style="height:40px;">Reset</a>
+        <a class="button" href="{{ url_for('books.top_rated') }}" style="height:40px;">Reset</a>
       </div>
     </div>
   {% endif %}

@@ -1,13 +1,15 @@
 """Tests for account security: passwords, reset links, sign-in limits, redirects and privacy."""
 import pytest
 
-import main
-from main import Book, Review, User, db, generate_reset_token, rate_limiter, safe_next_url
+from app.extensions import db
+from app.models import Book, Review, User
+from app.services import openlibrary
+from app.services.security import generate_reset_token, rate_limiter, safe_next_url
 
 
 @pytest.fixture(autouse=True)
 def no_open_library(monkeypatch):
-    monkeypatch.setattr(main, "_ol_description_for", lambda *args, **kwargs: "")
+    monkeypatch.setattr(openlibrary, "description_for", lambda *args, **kwargs: "")
 
 
 def make_user(email="reader@example.com", password="long-password", handle=None):

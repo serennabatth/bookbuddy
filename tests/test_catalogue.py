@@ -1,15 +1,17 @@
 """Tests for the catalogue: browsing, searching, Top Rated, pagination and seeding."""
 import pytest
 
-import main
-from main import Book, Favourite, Review, User, db
+from app import cli
+from app.extensions import db
+from app.models import Book, Favourite, Review, User
+from app.services import openlibrary
 
 
 @pytest.fixture(autouse=True)
 def no_open_library(monkeypatch):
     """Never call the real Open Library from tests."""
-    monkeypatch.setattr(main, "_ol_best_match", lambda *args, **kwargs: {})
-    monkeypatch.setattr(main, "_ol_description_for", lambda *args, **kwargs: "")
+    monkeypatch.setattr(openlibrary, "best_match", lambda *args, **kwargs: {})
+    monkeypatch.setattr(openlibrary, "description_for", lambda *args, **kwargs: "")
 
 
 def add_books(*pairs, genre="Classics"):
@@ -91,7 +93,7 @@ def test_search_api_returns_at_most_eight_matches_with_ids(client, app):
 
 def test_description_is_fetched_once_then_stored(client, app, monkeypatch):
     calls = []
-    monkeypatch.setattr(main, "_ol_description_for",
+    monkeypatch.setattr(openlibrary, "description_for",
                         lambda *args, **kwargs: calls.append(1) or "A vampire story.")
     (book,) = add_books(("Dracula", "Bram Stoker"))
 
@@ -105,7 +107,7 @@ def test_description_is_fetched_once_then_stored(client, app, monkeypatch):
 def test_seed_adds_curated_books_once_and_fixes_genres(app, tmp_path, monkeypatch):
     csv_file = tmp_path / "books.csv"
     csv_file.write_text("title,author,genre\nDune,Frank Herbert,Sci-Fi\nEmma,Jane Austen,Romance\n", encoding="utf-8")
-    monkeypatch.setattr(main, "SEED_FILE", str(csv_file))
+    monkeypatch.setattr(cli, "SEED_FILE", str(csv_file))
     add_books(("Emma", "Jane Austen"), genre="Horror")   # already there, wrong genre
     runner = app.test_cli_runner()
 
@@ -119,7 +121,7 @@ def test_seed_adds_curated_books_once_and_fixes_genres(app, tmp_path, monkeypatc
 def test_seed_reset_keeps_books_people_have_used(app, tmp_path, monkeypatch):
     csv_file = tmp_path / "books.csv"
     csv_file.write_text("title,author,genre\nDune,Frank Herbert,Sci-Fi\n", encoding="utf-8")
-    monkeypatch.setattr(main, "SEED_FILE", str(csv_file))
+    monkeypatch.setattr(cli, "SEED_FILE", str(csv_file))
     junk, loved = add_books(("Colouring Book", "Nobody"), ("Old Favourite", "Somebody"))
     reader = add_reader("r@example.com")
     db.session.add(Favourite(user_id=reader.id, book_id=loved.id))

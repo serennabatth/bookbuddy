@@ -5,7 +5,8 @@ from io import BytesIO
 import pytest
 from PIL import Image
 
-from main import User, normalize_handle
+from app.models import User
+from app.services.users import normalize_handle
 
 
 def sign_up(client, email, handle=""):

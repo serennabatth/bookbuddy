@@ -52,9 +52,29 @@ python -c "import secrets; print(secrets.token_hex(32))"
 Paste the printed value after `SECRET_KEY=` in `.env`, then:
 
 ```bash
-flask --app main db upgrade         # create the database tables
-flask --app main seed               # add starter books (needs internet)
-flask --app main run --debug        # open http://127.0.0.1:5000
+flask db upgrade         # create the database tables
+flask seed               # add starter books (needs internet)
+flask run --debug        # open http://127.0.0.1:5000
+```
+
+`.flaskenv` tells the `flask` command to load the app from `wsgi.py`.
+
+## Project Structure
+
+```
+app/
+  __init__.py      create_app() - builds the app
+  config.py        settings for development, testing and production
+  extensions.py    database, migrations, login and CSRF setup
+  models.py        database tables
+  cli.py           `flask seed` command
+  blueprints/      routes, grouped by area (auth, books, library, reviews, social, settings)
+  services/        logic used by the routes (Open Library, catalogue, security, users, avatars)
+templates/         Jinja templates
+static/            CSS, images and uploaded avatars
+migrations/        database migrations (Alembic)
+tests/             pytest tests
+wsgi.py            entry point
 ```
 
 ## Running the Tests

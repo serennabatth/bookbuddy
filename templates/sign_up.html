@@ -134,7 +134,7 @@
 
   <div class="title">Create an account</div>
 
-  <form method="POST" action="{{ url_for('signup') }}">
+  <form method="POST" action="{{ url_for('auth.signup') }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="field">
       <label class="label" for="name">Full Name</label>
@@ -175,7 +175,7 @@
 
   <div class="sub">
     Already have an account?
-    <a href="{{ url_for('login') }}">Sign in</a>
+    <a href="{{ url_for('auth.login') }}">Sign in</a>
   </div>
 </div>
 {% endblock %}

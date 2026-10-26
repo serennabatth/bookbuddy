@@ -25,7 +25,7 @@
   .h1{ text-align:center; }
 </style>
 
-  <a class="navicon" href="{{ url_for('add_review') }}" aria-label="Back">
+  <a class="navicon" href="{{ url_for('reviews.add_review') }}" aria-label="Back">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <polyline points="15 18 9 12 15 6"></polyline>
     </svg>
@@ -247,7 +247,7 @@
   </div>
 
   <!-- Form -->
-  <form id="bookForm" action="{{ url_for('add_book') }}" method="post">
+  <form id="bookForm" action="{{ url_for('books.add_book') }}" method="post">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
     <div class="field">

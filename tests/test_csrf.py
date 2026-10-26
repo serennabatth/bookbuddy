@@ -3,7 +3,7 @@ import re
 
 import pytest
 
-from main import User
+from app.models import User
 
 
 @pytest.fixture

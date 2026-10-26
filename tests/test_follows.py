@@ -2,7 +2,8 @@
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from main import Follow, User, db
+from app.extensions import db
+from app.models import Follow, User
 
 
 def make_user(email, handle, name="Reader"):

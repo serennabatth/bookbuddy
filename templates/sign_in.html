@@ -148,7 +148,7 @@
   <div class="brand">BookBuddy</div>
   <div class="title">Login</div>
 
-  <form method="POST" action="{{ url_for('login', next=request.args.get('next')) }}">
+  <form method="POST" action="{{ url_for('auth.login', next=request.args.get('next')) }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="field">
       <label class="label" for="email">Email</label>
@@ -168,12 +168,12 @@
     <button class="btn-dark" type="submit">Continue</button>
 
     <div class="forgot">
-      <a href="{{ url_for('forgot_password') }}">Forgot password?</a>
+      <a href="{{ url_for('auth.forgot_password') }}">Forgot password?</a>
     </div>
   </form>
 
   <div class="newto">New to BookBuddy?</div>
-  <a class="btn-light" href="{{ url_for('signup') }}">Sign Up</a>
+  <a class="btn-light" href="{{ url_for('auth.signup') }}">Sign Up</a>
 
   <div class="or">or</div>
 

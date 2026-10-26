@@ -27,7 +27,7 @@
   .h1{ text-align:center; }
 </style>
 
-  <a class="navicon" href="{{ url_for('home') }}" aria-label="Back">
+  <a class="navicon" href="{{ url_for('books.home') }}" aria-label="Back">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <polyline points="15 18 9 12 15 6"></polyline>
     </svg>
@@ -159,7 +159,7 @@
   {% set ql = q | lower %}
 
   <!-- search -->
-  <form class="f-search" action="{{ url_for('favourites') }}" method="get">
+  <form class="f-search" action="{{ url_for('library.favourites') }}" method="get">
     <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <circle cx="11" cy="11" r="7"></circle>
       <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
@@ -177,7 +177,7 @@
   {% if filtered and filtered|length %}
     <div class="f-grid">
       {% for b in filtered %}
-        <a class="f-tile" href="{{ url_for('book_details', book_id=b.id) }}">
+        <a class="f-tile" href="{{ url_for('books.book_details', book_id=b.id) }}">
           {{ book_cover(b) }}
           <div class="f-meta">
             <div class="f-rating">{% if b.review_count %}{{ '%.1f'|format(b.rating) }} ★ · {{ b.review_count }} review{{ '' if b.review_count == 1 else 's' }}{% else %}No reviews yet{% endif %}</div>
@@ -192,7 +192,7 @@
       <div class="t">No favourites yet</div>
       <div>Tap the ♥ on any book to save it here.</div>
       <div style="margin-top:12px;">
-        <a class="button" href="{{ url_for('browse') }}" style="height:40px;">Browse books</a>
+        <a class="button" href="{{ url_for('books.browse') }}" style="height:40px;">Browse books</a>
       </div>
     </div>
   {% endif %}

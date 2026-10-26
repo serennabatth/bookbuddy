@@ -1,8 +1,12 @@
 """Tests for choosing covers and showing them."""
 import pytest
 
-import main
-from main import Book, db, pick_best_search_result
+from app import cli
+from app.extensions import db
+from app.models import Book
+from app.services import openlibrary
+from app.services.catalogue import PLACEHOLDER_COVER
+from app.services.openlibrary import pick_best_search_result
 
 
 def test_prefers_the_english_well_known_edition():
@@ -28,12 +32,12 @@ def seed_file(tmp_path, monkeypatch):
     def write(text):
         path = tmp_path / "books.csv"
         path.write_text(text, encoding="utf-8")
-        monkeypatch.setattr(main, "SEED_FILE", str(path))
+        monkeypatch.setattr(cli, "SEED_FILE", str(path))
     return write
 
 
 def test_a_hand_picked_cover_id_wins(app, seed_file, monkeypatch):
-    monkeypatch.setattr(main, "_ol_best_match", lambda *a, **k: {"cover_i": "111", "cover": main._ol_cover_url(cover_i="111")})
+    monkeypatch.setattr(openlibrary, "best_match", lambda *a, **k: {"cover_i": "111", "cover": openlibrary.cover_url(cover_i="111")})
     seed_file("title,author,genre,cover_id\nDune,Frank Herbert,Sci-Fi,999\n")
     app.test_cli_runner().invoke(args=["seed"])
     assert Book.query.one().cover_i == "999"
@@ -42,14 +46,14 @@ def test_a_hand_picked_cover_id_wins(app, seed_file, monkeypatch):
 def test_refresh_covers_updates_saved_books(app, seed_file, monkeypatch):
     db.session.add(Book(title="Dune", author="Frank Herbert", genre="Sci-Fi", cover_i=""))
     db.session.commit()
-    monkeypatch.setattr(main, "_ol_best_match", lambda *a, **k: {"cover_i": "222", "cover": main._ol_cover_url(cover_i="222")})
+    monkeypatch.setattr(openlibrary, "best_match", lambda *a, **k: {"cover_i": "222", "cover": openlibrary.cover_url(cover_i="222")})
     seed_file("title,author,genre,cover_id\nDune,Frank Herbert,Sci-Fi,\n")
     app.test_cli_runner().invoke(args=["seed", "--refresh-covers"])
     assert Book.query.one().cover_i == "222"
 
 
 def test_book_without_art_shows_its_title_tile(client, app):
-    db.session.add(Book(title="Untitled Draft", author="Nobody", genre="Classics", cover=main.PLACEHOLDER_COVER))
+    db.session.add(Book(title="Untitled Draft", author="Nobody", genre="Classics", cover=PLACEHOLDER_COVER))
     db.session.commit()
     html = client.get("/browse").get_data(as_text=True)
     assert 'class="book-cover-tile"' in html

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block appbar %}
-  <a class="navicon" href="{{ url_for('profile_page') }}" aria-label="Back">
+  <a class="navicon" href="{{ url_for('social.profile_page') }}" aria-label="Back">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <polyline points="15 18 9 12 15 6"></polyline>
     </svg>
@@ -56,7 +56,7 @@
 </style>
 
 {% set handle_clean = (user.handle or '')|replace('@','') %}
-{% set share_url = url_for('public_profile', handle=handle_clean, _external=True) if handle_clean else url_for('profile_page', _external=True) %}
+{% set share_url = url_for('social.public_profile', handle=handle_clean, _external=True) if handle_clean else url_for('social.profile_page', _external=True) %}
 
 <div class="wrap">
   <!-- Header -->
@@ -79,7 +79,7 @@
   </div>
   <div class="grid">
     {% for b in books[:6] %}
-      <a class="card" href="{{ url_for('book_details', book_id=b.id) }}">
+      <a class="card" href="{{ url_for('books.book_details', book_id=b.id) }}">
         <img
   src="{{ b.cover }}"
   alt="{{ b.title }}"
@@ -98,7 +98,7 @@
 <div class="modal" id="qrModal" aria-hidden="true">
   <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="qrTitle">
     <div id="qrTitle" style="font-weight:700; margin-bottom:6px;">Scan to view profile</div>
-    <img src="{{ url_for('qr_profile', url=share_url) }}" alt="QR code">
+    <img src="{{ url_for('social.qr_profile', url=share_url) }}" alt="QR code">
     <button class="close" id="closeQr">Close</button>
   </div>
 </div>

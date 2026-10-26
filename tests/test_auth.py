@@ -1,5 +1,5 @@
 """Tests for signing up and logging in."""
-from main import User
+from app.models import User
 
 
 def test_login_page_loads(client):

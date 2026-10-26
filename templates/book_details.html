@@ -3,7 +3,7 @@
 {% set top_rated = top_rated | default([]) %}
 
 {% block appbar %}
-  <a class="navicon" href="{{ url_for('browse') }}" aria-label="Back">
+  <a class="navicon" href="{{ url_for('books.browse') }}" aria-label="Back">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <polyline points="15 18 9 12 15 6"></polyline>
     </svg>
@@ -71,7 +71,7 @@
         </button>
 
         <a class="button primary"
-           href="{{ url_for('edit_review', review_id=my_review_id) if my_review_id else url_for('add_review') }}"
+           href="{{ url_for('reviews.edit_review', review_id=my_review_id) if my_review_id else url_for('reviews.add_review') }}"
            style="text-align:center; display:flex; align-items:center; justify-content:center; text-decoration:none;">
           {{ "Edit your review" if my_review_id else "Add Review" }}
         </a>
@@ -85,7 +85,7 @@
 
   <div class="section">
     <div class="title">User reviews</div>
-    <a class="see" href="{{ url_for('book_reviews', book_id=book.id) }}">See all</a>
+    <a class="see" href="{{ url_for('books.book_reviews', book_id=book.id) }}">See all</a>
   </div>
 
   {% if reviews %}
@@ -107,8 +107,8 @@
           {% if r.is_mine %}
             {# Only shown on your own review. The server checks ownership too. #}
             <div style="display:flex; gap:12px; align-items:center; margin-top:8px; font-size:13px;">
-              <a href="{{ url_for('edit_review', review_id=r.id) }}" style="font-weight:600;">Edit</a>
-              <form method="post" action="{{ url_for('delete_review', review_id=r.id) }}"
+              <a href="{{ url_for('reviews.edit_review', review_id=r.id) }}" style="font-weight:600;">Edit</a>
+              <form method="post" action="{{ url_for('reviews.delete_review', review_id=r.id) }}"
                     onsubmit="return confirm('Delete your review? This can\'t be undone.');" style="margin:0;">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" style="height:auto; padding:4px 0; border:0; background:none; box-shadow:none; color:var(--text-2); font-size:13px; font-weight:600;">Delete</button>

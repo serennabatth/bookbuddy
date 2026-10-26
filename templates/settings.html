@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block appbar %}
-  <a class="navicon" href="{{ url_for('profile_page') }}" aria-label="Back">
+  <a class="navicon" href="{{ url_for('social.profile_page') }}" aria-label="Back">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <polyline points="15 18 9 12 15 6"></polyline>
     </svg>
@@ -73,7 +73,7 @@
   <!-- Account -->
   <div class="sect-title">ACCOUNT</div>
   <div class="list">
-    <a class="row" href="{{ url_for('edit_profile') }}">
+    <a class="row" href="{{ url_for('settings.edit_profile') }}">
       <div class="row-left">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
           <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
@@ -86,7 +86,7 @@
       <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6"/></svg>
     </a>
 
-    <a class="row" href="{{ url_for('change_password') }}">
+    <a class="row" href="{{ url_for('settings.change_password') }}">
       <div class="row-left">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
           <circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
@@ -123,7 +123,7 @@
   <!-- Privacy & Help -->
   <div class="sect-title">PRIVACY & HELP</div>
   <div class="list">
-    <a class="row" href="{{ url_for('privacy_settings') }}">
+    <a class="row" href="{{ url_for('settings.privacy_settings') }}">
       <div class="row-left">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
@@ -152,7 +152,7 @@
       <p>Are you sure you want to log out of your account?</p>
       <div class="modal-buttons">
         <button class="cancel" type="button" onclick="closeLogoutModal()">Cancel</button>
-        <form id="logoutForm" action="{{ url_for('logout') }}" method="post" style="display:inline;">
+        <form id="logoutForm" action="{{ url_for('auth.logout') }}" method="post" style="display:inline;">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button class="confirm" type="submit">Log out</button>
         </form>

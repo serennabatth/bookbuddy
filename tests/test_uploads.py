@@ -5,7 +5,7 @@ from io import BytesIO
 import pytest
 from PIL import Image
 
-from main import User
+from app.models import User
 
 
 @pytest.fixture
