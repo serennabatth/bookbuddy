@@ -1,61 +1,185 @@
 {% extends "base.html" %}
 
 {% block appbar %}
+<style>
+  /* White header */
+  .appbar{
+    background:#fff !important;
+    border-bottom: 1px solid rgba(0,0,0,0.06) !important;
+    backdrop-filter:none !important;
+    display:grid !important;
+    grid-template-columns: 44px 1fr 44px;
+    align-items:center;
+  }
+  .navicon{
+    background:transparent !important;
+    border:none !important;
+    box-shadow:none !important;
+    width:44px !important;
+    height:44px !important;
+    border-radius:0 !important;
+    padding:0 !important;
+    color:#111 !important;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .h1{ text-align:center; }
+</style>
+
   <a class="navicon" href="{{ url_for('add_review') }}" aria-label="Back">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <polyline points="15 18 9 12 15 6"></polyline>
     </svg>
   </a>
   <div class="h1">Add New Book</div>
+  <div aria-hidden="true"></div>
 {% endblock %}
 
 {% block content %}
 <style>
-  .page { padding:0 16px 32px; }
+  .wrap{
+    padding: 14px 16px 28px;
+    max-width: 520px;
+    margin: 0 auto;
+  }
 
-  form { display:flex; flex-direction:column; gap:16px; }
+  form{ display:flex; flex-direction:column; gap:16px; }
 
-  .field { display:flex; flex-direction:column; gap:6px; }
-  .label { font-size:12px; color:#6B7280; }
+  .field{ display:flex; flex-direction:column; gap:8px; }
+  .label{
+    font-size:16px;
+    font-weight:550;
+    color:#111;
+  }
 
-  .input {
-    height:48px;
-    border:none;
-    border-radius:12px;
-    background:#F3F3F3;
-    padding:0 12px;
-    font-size:14px;
+  /* white pill inputs */
+  .input{
+    height:52px;
+    border-radius:14px;
+    border:1px solid rgba(0,0,0,0.06);
+    background:#fff;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+    padding:0 16px;
+    font-size:15px;
     color:#111;
     font-family: inherit;
-  }
-  .input:focus { outline:2px solid #111; }
 
-  select.input {
+    outline:0 !important;
+    -webkit-appearance:none;
     appearance:none;
-    background:#F3F3F3 url('data:image/svg+xml;utf8,<svg fill="none" stroke="black" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><polyline points="6 9 12 15 18 9"/></svg>')
-      no-repeat right 12px center/16px;
+  }
+  .input::placeholder{ color: rgba(0,0,0,0.35); }
+
+  /* Open Library section */
+  .ol{
+    margin-bottom:14px;
+    width:100%;
   }
 
-  .button.primary {
+  /* Search pill  */
+  .f-search{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    height:40px;                
+    padding:0 14px;
+    border-radius:14px;
+    background:#fff;
+    border:1px solid rgba(0,0,0,0.06);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+    width:100%;
+  }
+  .f-search .icon{
+    width:18px;
+    height:18px;
+    color: rgba(0,0,0,0.45);
+    flex:0 0 18px;
+  }
+  .f-search input{
+    width:100%;
+    border:0 !important;
+    outline:0 !important;
+    background:transparent !important;
+    box-shadow:none !important;
+    -webkit-appearance:none;
+    appearance:none;
+    font-size:15px;
+    font-family:inherit;
+    color:#111;
+    padding:0 !important;
+    margin:0 !important;
+  }
+  .f-search input::placeholder{
+    color: rgba(0,0,0,0.45);
+  }
+
+  /* Select matches pill style */
+  select.input{
+    padding-right:42px;
+    background:
+      #fff
+      url('data:image/svg+xml;utf8,<svg fill="none" stroke="black" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><polyline points="6 9 12 15 18 9"/></svg>')
+      no-repeat right 14px center/16px;
+  }
+
+  /* Review textarea big box */
+  .textarea{
+    min-height:170px;
+    padding:14px 16px;
+    border-radius:16px;
+    border:1px solid rgba(0,0,0,0.06);
+    background:#fff;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+    font-size:15px;
+    font-family:inherit;          
+    resize:none;
+    outline:0 !important;
+  }
+  .textarea::placeholder{ color: rgba(0,0,0,0.35); }
+
+  /* Stars bar container */
+  .stars-wrap{
+    height:52px;
+    border-radius:16px;
+    border:1px solid rgba(0,0,0,0.06);
+    background:#fff;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:14px;
+    padding:0 12px;
+  }
+
+  .star-btn{
+    width:28px; height:28px;
+    border:0;
+    background:transparent;
+    padding:0;
+    cursor:pointer;
+    color: rgba(0,0,0,0.22);
+  }
+  .star-btn.active{ color:#111; }
+
+  /* Buttons row */
+  .btn-row{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px;
+    margin-top:6px;
+  }
+
+  .btn{
+    height:52px;
+    border-radius:10px;
+    border:0;
     background:#111;
     color:#fff;
-    font-weight:600;
-    height:48px;
-    border:none;
-    border-radius:12px;
+    font-weight:650;
+    font-size:16px;
     cursor:pointer;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.10);
   }
-  .button.primary:active { opacity:0.9; }
-
-  /* Open Library search area */
-  .searchwrap{
-    background:#fff;
-    border:1px solid #E5E7EB;
-    border-radius:12px;
-    padding:12px;
-    box-shadow:0 1px 3px rgba(0,0,0,.08);
-    margin-bottom:8px;
-  }
+  .btn:active{ opacity:.92; }
 
   .results{
     display:flex;
@@ -68,22 +192,22 @@
     display:flex;
     gap:10px;
     align-items:center;
-    padding:10px;
-    border:1px solid #E5E7EB;
-    border-radius:12px;
+    padding:10px 12px;
+    border:1px solid rgba(0,0,0,0.06);
+    border-radius:14px;
     background:#fff;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.06);
     cursor:pointer;
   }
-  .result:active{ background:#f7f7f7; }
+  .result:active{ opacity:.92; }
 
   .thumb{
-    width:44px;height:60px;
-    border-radius:10px;
-    background:#F3F3F3;
+    width:44px; height:60px;
+    border-radius:12px;
+    background: rgba(0,0,0,0.06);
     object-fit:cover;
     flex:0 0 auto;
   }
-
   .rmeta{ flex:1; min-width:0; }
   .rtitle{
     font-size:14px;
@@ -92,51 +216,48 @@
   }
   .rauthor{
     font-size:12px;
-    color:#6B7280;
+    color: rgba(0,0,0,0.45);
     margin-top:4px;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   }
-
   .pill{
     font-size:12px;
-    color:#6B7280;
+    color: rgba(0,0,0,0.45);
     padding:4px 8px;
-    border:1px solid #E5E7EB;
+    border:1px solid rgba(0,0,0,0.06);
     border-radius:999px;
     background:#fff;
     flex:0 0 auto;
   }
-
-  .muted{
-    font-size:12px;
-    color:#6B7280;
-    margin-top:8px;
-  }
 </style>
 
-<div class="page">
+<div class="wrap">
 
   <!-- Open Library Search -->
-  <div class="searchwrap">
-    <div class="field" style="gap:8px;">
-      <label class="label">Search Open Library</label>
-      <input id="ol_q" class="input" type="text" placeholder="Type a book title or author…">
-      <div class="muted">Tap a result to auto-fill the form below.</div>
+  <div class="ol">
+    <div class="f-search">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="7"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+      <input id="ol_q" type="text" placeholder="Search" autocomplete="off">
     </div>
 
     <div id="ol_results" class="results" aria-live="polite"></div>
   </div>
 
-  <!-- Manual/Add form -->
+  <!-- Form -->
   <form id="bookForm" action="{{ url_for('add_book') }}" method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
     <div class="field">
       <label class="label">Title</label>
-      <input id="title" class="input" type="text" name="title" placeholder="e.g. The Handmaid’s Tale" required>
+      <input id="title" class="input" type="text" name="title" placeholder="Enter Title..." required>
     </div>
 
     <div class="field">
       <label class="label">Author</label>
-      <input id="author" class="input" type="text" name="author" placeholder="e.g. Margaret Atwood" required>
+      <input id="author" class="input" type="text" name="author" placeholder="Enter Author..." required>
     </div>
 
     <div class="field">
@@ -148,17 +269,27 @@
       </select>
     </div>
 
-    <div class="field">
-      <label class="label">Year</label>
-      <input id="year" class="input" type="number" name="year" placeholder="e.g. 1985">
+    <!-- Review box -->
+    <textarea id="review" name="review" class="textarea" placeholder="Write your review..."></textarea>
+
+    <!-- Stars -->
+    <input type="hidden" id="rating" name="rating" value="0">
+    <div class="stars-wrap" aria-label="Rating">
+      {% for i in range(1,6) %}
+      <button type="button" class="star-btn" data-v="{{ i }}" aria-label="{{ i }} stars">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor" aria-hidden="true">
+          <path d="M12 17.27l5.18 3.05-1.64-5.81L20 10.24l-6.02-.52L12 4 10.02 9.72 4 10.24l4.46 4.27-1.64 5.81L12 17.27z"/>
+        </svg>
+      </button>
+      {% endfor %}
     </div>
 
-    <div class="field">
-      <label class="label">Cover Image URL</label>
-      <input id="cover" class="input" type="url" name="cover" placeholder="Paste image link here">
+    <!-- Buttons -->
+    <div class="btn-row">
+      <button class="btn" type="submit">Submit Review</button>
+      <button class="btn" type="button" id="clearBtn">Clear Review</button>
     </div>
 
-    <button class="button primary" type="submit">Add Book</button>
   </form>
 </div>
 {% endblock %}
@@ -171,8 +302,10 @@
 
   const title = document.getElementById('title');
   const author = document.getElementById('author');
-  const year = document.getElementById('year');
-  const cover = document.getElementById('cover');
+
+  const review = document.getElementById('review');
+  const ratingInput = document.getElementById('rating');
+  const clearBtn = document.getElementById('clearBtn');
 
   let timer = null;
 
@@ -185,9 +318,7 @@
   function render(items){
     results.innerHTML = '';
     if (!items || items.length === 0){
-      if (q.value.trim().length >= 2){
-        results.innerHTML = '<div class="muted">No results found. Try a different search.</div>';
-      }
+      // keep clean 
       return;
     }
 
@@ -207,18 +338,12 @@
       `;
     }).join('');
 
-    // click handlers
     Array.from(results.querySelectorAll('.result')).forEach(el => {
       el.addEventListener('click', () => {
         const idx = parseInt(el.getAttribute('data-i'), 10);
-        const b = items[idx];
-
+        const b = items[idx] || {};
         title.value = b.title || '';
         author.value = b.author || '';
-        year.value = b.year || '';
-        cover.value = b.cover || '';
-
-        // scroll to form start
         title.scrollIntoView({behavior:'smooth', block:'center'});
       });
     });
@@ -230,19 +355,48 @@
       results.innerHTML = '';
       return;
     }
-
     try{
       const res = await fetch(`/api/openlibrary?q=${encodeURIComponent(term)}`);
       const data = await res.json();
       render(data);
     }catch(e){
-      results.innerHTML = '<div class="muted">Search unavailable right now.</div>';
+      // keep it clean
+      results.innerHTML = '';
     }
   }
 
   q.addEventListener('input', () => {
     clearTimeout(timer);
     timer = setTimeout(search, 250);
+  });
+
+  // Stars
+  const starBtns = Array.from(document.querySelectorAll('.star-btn'));
+  function paint(v){
+    starBtns.forEach(btn => {
+      const n = Number(btn.dataset.v);
+      btn.classList.toggle('active', n <= v);
+    });
+  }
+  starBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const v = Number(btn.dataset.v || 0);
+      ratingInput.value = String(v);
+      paint(v);
+    });
+  });
+  paint(Number(ratingInput.value || 0));
+
+  // Clear
+  clearBtn.addEventListener('click', () => {
+    title.value = '';
+    author.value = '';
+    review.value = '';
+    ratingInput.value = '0';
+    paint(0);
+    q.value = '';
+    results.innerHTML = '';
+    title.scrollIntoView({behavior:'smooth', block:'center'});
   });
 })();
 </script>

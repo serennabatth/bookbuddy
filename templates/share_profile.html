@@ -79,7 +79,7 @@
   </div>
   <div class="grid">
     {% for b in books[:6] %}
-      <a class="card" href="{{ url_for('book_details', title=b.title) }}">
+      <a class="card" href="{{ url_for('book_details', book_id=b.id) }}">
         <img
   src="{{ b.cover }}"
   alt="{{ b.title }}"

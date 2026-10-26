@@ -135,6 +135,7 @@
   <div class="title">Create an account</div>
 
   <form method="POST" action="{{ url_for('signup') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="field">
       <label class="label" for="name">Full Name</label>
       <input id="name" name="name" class="input" placeholder="e.g. Serenna Batth" required>

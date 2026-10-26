@@ -96,7 +96,7 @@
   {% if reviews and reviews|length %}
     <div class="list">
       {% for r in reviews %}
-        <a href="{{ url_for('book_details', title=r.book_title) }}"
+        <a href="{{ url_for('book_details', book_id=r.book_id) }}"
            class="card row">
 
           <div class="thumb">

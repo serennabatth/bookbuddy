@@ -1,171 +1,346 @@
 {% extends "base.html" %}
 
 {% block appbar %}
+<style>
+  /* White header */
+  .appbar{
+    background:#fff !important;
+    border-bottom:1px solid rgba(0,0,0,0.06) !important;
+    backdrop-filter:none !important;
+    display:grid !important;
+    grid-template-columns:44px 1fr 44px;
+    align-items:center;
+  }
+  .navicon{
+    background:transparent !important;
+    border:none !important;
+    box-shadow:none !important;
+    width:44px !important;
+    height:44px !important;
+    border-radius:0 !important;
+    padding:0 !important;
+    color:#111 !important;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .h1{ text-align:center; }
+</style>
+
   <a class="navicon" href="{{ url_for('home') }}" aria-label="Back">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <polyline points="15 18 9 12 15 6"></polyline>
     </svg>
   </a>
   <div class="h1">Add Review</div>
+  <div aria-hidden="true"></div>
 {% endblock %}
 
 {% block content %}
 <style>
-  .page { padding: 0 16px 24px; }
-
-  /* search */
-  .search {
-    display:flex; align-items:center; gap:10px;
-    background:#fff; border-radius:12px; padding:10px 12px;
-    box-shadow:var(--shadow); position:relative;
-  }
-  .search .icon { width:18px; height:18px; color:#9CA3AF; flex:0 0 18px; }
-  .search input { border:0; outline:0; background:transparent; width:100%; font-size:14px; }
-
-  /* dropdown */
-  .dropdown {
-    position:absolute; left:0; right:0; top:100%; margin-top:6px;
-    background:#fff; border-radius:12px; box-shadow:var(--shadow);
-    overflow:hidden; display:none; max-height:320px; overflow-y:auto; z-index:5;
-  }
-  .dropdown.open { display:block; }
-  .dd-row { display:flex; align-items:center; gap:12px; padding:10px 12px; text-decoration:none; color:inherit; cursor:pointer; }
-  .dd-row + .dd-row { border-top:1px solid #EFEFEF; }
-  .dd-row:focus { outline:none; background:#F3F4F6; }
-  .dd-thumb { width:40px; height:54px; border-radius:8px; overflow:hidden; background:#F3F4F6; flex:0 0 40px; }
-  .dd-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
-  .dd-meta { min-width:0; flex:1 1 auto; }
-  .dd-title { font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .dd-sub { font-size:12px; color:#6B7280; }
-
-  /* “Add New Book” row */
-  .add-row { display:flex; gap:12px; align-items:center; padding:10px 12px; cursor:pointer; text-decoration:none; color:inherit; }
-  .add-icon { width:40px; height:54px; border-radius:8px; background:#F3F4F6; display:flex; align-items:center; justify-content:center; }
-  .plus { width:18px; height:18px; }
-
-  /* empty state */
-  .dd-empty { padding:12px; font-size:13px; color:#6B7280; }
-
-  /* selected book strip */
-  .selected { margin-top:12px; background:#fff; border-radius:12px; box-shadow:var(--shadow); overflow:hidden; display:none; }
-  .selected.show { display:block; }
-  .sel-row { display:flex; gap:12px; align-items:center; padding:12px; }
-  .sel-thumb { width:48px; height:64px; border-radius:8px; overflow:hidden; background:#F3F4F6; flex:0 0 48px; }
-  .sel-thumb img { width:100%; height:100%; object-fit:cover; }
-  .sel-meta .t { font-size:14px; font-weight:600; line-height:1.25; }
-  .sel-meta .s { font-size:12px; color:#6B7280; }
-  .sel-clear { margin-left:auto; color:#9CA3AF; border:none; background:transparent; cursor:pointer; }
-
-  /* composer card */
-  .composer { margin-top:12px; background:#fff; border-radius:12px; box-shadow:var(--shadow); padding:12px; }
-  .composer textarea{
-    width:100%; min-height:160px; resize:vertical; border:0; outline:0; background:#F9FAFB;
-    border-radius:10px; padding:12px; font-size:14px;
+  .wrap{
+    padding: 14px 16px 28px;
+    max-width: 520px;
+    margin: 0 auto;
   }
 
-  /* stars row */
-  .stars { display:flex; gap:16px; align-items:center; background:#fff; border-radius:12px; box-shadow:var(--shadow); padding:12px; margin-top:12px; }
-  .star { width:28px; height:28px; color:#D1D5DB; cursor:pointer; transition:color .15s ease-in-out; }
-  .star.active { color:#111; }
+  /* Search pill  */
+  .f-search{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    height:44px;
+    padding:0 14px;
+    border-radius:14px;
+    background:#fff;
+    border:1px solid rgba(0,0,0,0.06);
+    box-shadow:0 6px 18px rgba(0,0,0,0.06);
+  }
+  .f-search .icon{ width:18px; height:18px; color: rgba(0,0,0,0.45); flex:0 0 18px; }
+  .f-search input{
+    width:100%;
+    border:0 !important;
+    outline:0 !important;
+    background:transparent !important;
+    box-shadow:none !important;
+    -webkit-appearance:none;
+    appearance:none;
+    font-size:15px;
+    font-family:inherit;
+    color:#111;
+    padding:0 !important;
+    margin:0 !important;
+  }
+  .f-search input::placeholder{ color: rgba(0,0,0,0.45); }
 
-  .hint { margin-top:8px; font-size:12px; color:#6B7280; }
+  /* Cards  */
+  .card{
+    background:#fff;
+    border:1px solid rgba(0,0,0,0.06);
+    border-radius:16px;
+    box-shadow:0 6px 18px rgba(0,0,0,0.06);
+    overflow:hidden;
+  }
 
-  /* actions */
-  .actions { display:flex; gap:12px; margin-top:16px; }
-  .button { display:inline-flex; align-items:center; justify-content:center; height:44px; padding:0 16px; border-radius:12px; border:none; cursor:pointer; font-weight:600; }
-  .button.primary { background:#111; color:#fff; }
-  .button.secondary { background:#fff; color:#111; box-shadow:var(--shadow); }
+  .stack{ display:flex; flex-direction:column; gap:14px; margin-top:14px; }
+
+  /* Rows */
+  .row{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:12px 12px;
+    cursor:pointer;
+    text-decoration:none;
+    color:inherit;
+  }
+  .row + .row{ border-top:1px solid rgba(0,0,0,0.08); }
+
+  .thumb{
+    width:54px; height:54px;
+    border-radius:12px;
+    background: rgba(0,0,0,0.06);
+    overflow:hidden;
+    flex:0 0 54px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
+
+  .meta{ flex:1; min-width:0; }
+  .title{
+    font-size:16px;
+    font-weight:650;
+    color:#111;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    line-height:1.2;
+  }
+  .sub{
+    font-size:13px;
+    color: rgba(0,0,0,0.55);
+    margin-top:4px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+
+  .chev{
+    width:20px; height:20px;
+    color: rgba(0,0,0,0.55);
+    flex:0 0 20px;
+  }
+
+  .plus{ width:22px; height:22px; color:#111; }
+
+  /* Selected book card */
+  .sel-top{ display:flex; gap:14px; align-items:center; padding:14px; }
+  .sel-cover{
+    width:64px; height:84px;
+    border-radius:14px;
+    background: rgba(0,0,0,0.06);
+    overflow:hidden;
+    flex:0 0 64px;
+  }
+  .sel-cover img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .sel-meta{ flex:1; min-width:0; }
+  .sel-rating{
+    margin-top:8px;
+    font-size:13px;
+    color: rgba(0,0,0,0.45);
+  }
+
+  /* Review box card */
+  .reviewbox{ padding:14px; }
+  .reviewbox textarea{
+    width:100%;
+    min-height:190px;
+    border:none !important;
+    outline:none !important;
+    box-shadow:none !important;
+    background:transparent !important;
+    resize:none;
+    font-size:15px;
+    font-family:inherit;
+    color:#111;
+    padding:0 !important;
+    margin:0 !important;
+    -webkit-appearance:none;
+    appearance:none;
+  }
+  .reviewbox textarea::placeholder{ color: rgba(0,0,0,0.35); }
+
+  /* Stars card */
+  .starswrap{
+    height:54px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:18px;
+    padding:0 14px;
+  }
+  .star{
+    width:26px; height:26px;
+    color: rgba(0,0,0,0.20);
+    cursor:pointer;
+  }
+  .star.active{ color:#111; }
+
+  /* Buttons */
+  .btn-row{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:18px;
+    margin-top:8px;
+  }
+  .btn{
+    height:52px;
+    border-radius:10px;
+    border:0;
+    background:#111;
+    color:#fff;
+    font-weight:650;
+    font-size:16px;
+    cursor:pointer;
+    box-shadow:0 6px 18px rgba(0,0,0,0.10);
+  }
+  .btn:active{ opacity:.92; }
+
+  /* Dropdown */
+  .dropdown{ position:relative; display:none; }
+  .dropdown.open{ display:block; }
+
+  .hint{
+    padding:12px;
+    font-size:13px;
+    color: rgba(0,0,0,0.50);
+  }
+
+  /* helper hide */
+  .is-hidden{ display:none !important; }
 </style>
 
-<div class="page">
+<div class="wrap">
 
-  <!-- search with dropdown -->
-  <div class="search">
+  <!-- Search -->
+  <div class="f-search">
     <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      <circle cx="11" cy="11" r="7"></circle>
+      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
     </svg>
-    <input id="searchInput" type="text" placeholder="Search for a book" autocomplete="off" aria-label="Search for a book">
-    <div id="dropdown" class="dropdown" role="listbox" aria-label="Book results">
-      <a class="add-row" href="{{ url_for('add_book') }}">
-        <div class="add-icon">
+    <input id="searchInput" type="text" placeholder="Search for a book" autocomplete="off">
+  </div>
+
+  <div class="stack">
+
+    <!-- TOP CARD -->
+    <div class="card">
+      <div id="topResult" class="row" style="display:none;">
+        <div class="thumb"><img id="topCover" alt=""></div>
+        <div class="meta">
+          <div class="title" id="topTitle"></div>
+          <div class="sub" id="topAuthor"></div>
+        </div>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <polyline points="9 18 15 12 9 6"></polyline>
+        </svg>
+      </div>
+
+      <!-- ✅ This stays on the page, BUT we hide it while dropdown is open -->
+      <a id="addBookRow" class="row" href="{{ url_for('add_book') }}">
+        <div class="thumb" aria-hidden="true">
           <svg class="plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line>
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
           </svg>
         </div>
-        <div class="dd-meta">
-          <div class="dd-title">Add New Book</div>
-          <div class="dd-sub">Not found? Click to add it.</div>
+        <div class="meta">
+          <div class="sub" style="font-size:15px; color:rgba(0,0,0,0.55); margin:0;">Add New Book</div>
         </div>
       </a>
-      <div id="ddList"></div>
-      <div id="ddEmpty" class="dd-empty" style="display:none;">No matches. Try another title/author.</div>
-    </div>
-  </div>
 
-  <!-- selected book summary -->
-  <div id="selected" class="selected" aria-live="polite">
-    <div class="sel-row">
-      <div class="sel-thumb"><img id="selCover" alt=""></div>
-      <div class="sel-meta">
-        <div class="t" id="selTitle"></div>
-        <div class="s" id="selAuthor"></div>
+      <!-- Dropdown list -->
+      <div id="dropdown" class="dropdown">
+        <div id="ddList"></div>
+        <div id="ddEmpty" class="hint" style="display:none;">No matches. Try another title/author.</div>
       </div>
-      <button class="sel-clear" id="clearSel" title="Clear" type="button">✕</button>
     </div>
-  </div>
 
-  <!-- composer -->
-  <div class="composer">
-    <textarea id="reviewText" placeholder="Write your review..." required></textarea>
-  </div>
+    <!-- SELECTED BOOK CARD -->
+    <div id="selectedCard" class="card" style="display:none;">
+      <div class="sel-top">
+        <div class="sel-cover"><img id="selCover" alt=""></div>
+        <div class="sel-meta">
+          <div class="title" id="selTitle"></div>
+          <div class="sub" id="selAuthor"></div>
+          <div class="sel-rating" id="selAvg"></div>
+        </div>
+      </div>
+    </div>
 
-  <!-- stars -->
-  <div class="stars" id="starRow" role="radiogroup" aria-label="Rating">
-    {% for i in range(1,6) %}
-      <svg class="star" data-val="{{ i }}" viewBox="0 0 24 24" fill="currentColor" aria-label="{{ i }} star" tabindex="0">
-        <path d="M12 17.27l5.18 3.09-1.64-5.81L20.5 9.5l-6-.26L12 4 9.5 9.24l-6 .26 4.96 4.05-1.64 5.81L12 17.27z"/>
-      </svg>
-    {% endfor %}
-  </div>
+    <!-- REVIEW BOX -->
+    <div class="card reviewbox">
+      <textarea id="reviewText" placeholder="Write your review..." required></textarea>
+    </div>
 
+    <!-- STARS -->
+    <div class="card">
+      <div class="starswrap" id="starRow" role="radiogroup" aria-label="Rating">
+        {% for i in range(1,6) %}
+          <svg class="star" data-val="{{ i }}" viewBox="0 0 24 24" fill="currentColor" aria-label="{{ i }} star" tabindex="0">
+            <path d="M12 17.27l5.18 3.09-1.64-5.81L20.5 9.5l-6-.26L12 4 9.5 9.24l-6 .26 4.96 4.05-1.64 5.81L12 17.27z"/>
+          </svg>
+        {% endfor %}
+      </div>
+    </div>
 
-  <!-- actions -->
-  <div class="actions">
-    <button class="button primary" id="submitBtn" type="button">Submit Review</button>
-    <button class="button secondary" id="clearBtn" type="button">Clear Review</button>
+    <!-- BUTTONS -->
+    <div class="btn-row">
+      <button class="btn" id="submitBtn" type="button">Submit Review</button>
+      <button class="btn" id="clearBtn" type="button">Clear Review</button>
+    </div>
+
   </div>
 
   <!-- hidden real post form -->
   <form id="postForm" action="{{ url_for('add_review') }}" method="post" style="display:none;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="book_title" id="bookTitle">
+    <input type="hidden" name="book_id" id="bookId">
     <input type="hidden" name="review" id="reviewField">
     <input type="hidden" name="rating" id="ratingField" value="0">
   </form>
+
 </div>
 
-<script id="book-data" type="application/json">{{ books|tojson|safe }}</script>
 
 <script>
-  const BOOKS = JSON.parse(document.getElementById('book-data').textContent) || [];
+  // Each search asks the server; this counter ignores answers to older searches
+  // that arrive after a newer one (e.g. typing "dra" then "drac" quickly).
+  let latestSearch = 0;
+  let searchTimer = null;
   const PLACEHOLDER = "https://placehold.co/400x600/EEE/AAA?text=No+Cover";
+  const CHEVRON_SVG = '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>';
 
-  // Elements
   const input = document.getElementById('searchInput');
-  const dd = document.getElementById('dropdown');
+
+  const dropdown = document.getElementById('dropdown');
   const ddList = document.getElementById('ddList');
   const ddEmpty = document.getElementById('ddEmpty');
 
-  const selected = document.getElementById('selected');
+  const topResult = document.getElementById('topResult');
+  const topCover = document.getElementById('topCover');
+  const topTitle = document.getElementById('topTitle');
+  const topAuthor = document.getElementById('topAuthor');
+
+  const addBookRow = document.getElementById('addBookRow');
+
+  const selectedCard = document.getElementById('selectedCard');
   const selTitle = document.getElementById('selTitle');
   const selAuthor = document.getElementById('selAuthor');
   const selCover = document.getElementById('selCover');
-  const clearSel = document.getElementById('clearSel');
+  const selAvg = document.getElementById('selAvg');
 
   const reviewText = document.getElementById('reviewText');
   const submitBtn = document.getElementById('submitBtn');
   const clearBtn = document.getElementById('clearBtn');
 
   const bookTitleField = document.getElementById('bookTitle');
+  const bookIdField = document.getElementById('bookId');
   const reviewField = document.getElementById('reviewField');
   const ratingField = document.getElementById('ratingField');
 
@@ -173,71 +348,96 @@
   const stars = Array.from(document.querySelectorAll('.star'));
   let rating = 0;
 
-  function paintStars() {
+  function paintStars(){
     stars.forEach((s, i) => s.classList.toggle('active', i < rating));
   }
 
   stars.forEach((s, i) => {
-    s.addEventListener('click', () => {
-      rating = i + 1;
-      paintStars();
-    });
+    s.addEventListener('click', () => { rating = i + 1; paintStars(); });
     s.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        rating = i + 1;
-        paintStars();
-      }
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); rating = i + 1; paintStars(); }
     });
   });
 
-  // Dropdown rendering
-  let lastResults = [];
 
-  function openDropdown() {
-    dd.classList.add('open');
+  function openDropdown(){
+    dropdown.classList.add('open');
+    // ✅ Hide Add New Book row while dropdown is open (so it’s NOT part of the “search results” view)
+    addBookRow.classList.add('is-hidden');
   }
 
-  function closeDropdown() {
-    dd.classList.remove('open');
+  function closeDropdown(){
+    dropdown.classList.remove('open');
+    addBookRow.classList.remove('is-hidden');
   }
 
-  function renderList(q) {
+  async function renderList(q){
+    const term = (q || '').trim();
+    const searchId = ++latestSearch;
+
+    let results = [];
+    try {
+      const res = await fetch(`/api/search?q=${encodeURIComponent(term)}`, { credentials: 'same-origin' });
+      if (res.ok) results = await res.json();
+    } catch (e) {
+      results = [];
+    }
+    if (searchId !== latestSearch) return;  // a newer search has started; drop this one
+
     ddList.innerHTML = '';
-    const term = (q || '').trim().toLowerCase();
 
-    // show results even when empty query (browse mode)
-    const results = BOOKS
-      .filter(b => {
-        const t = (b.title || '').toLowerCase();
-        const a = (b.author || '').toLowerCase();
-        return !term || t.includes(term) || a.includes(term);
-      })
-      .slice(0, 25);
+    // Top result row
+    if (results.length){
+      const b = results[0];
+      topCover.src = (b.cover || '').trim() || PLACEHOLDER;
+      topCover.onerror = () => { topCover.src = PLACEHOLDER; };
+      topTitle.textContent = b.title || '';
+      topAuthor.textContent = b.author || '';
+      topResult.style.display = 'flex';
+      topResult.onclick = () => selectBook(b);
+    } else {
+      topResult.style.display = 'none';
+    }
 
-    lastResults = results;
+    ddEmpty.style.display = (term && !results.length) ? 'block' : 'none';
 
-    ddEmpty.style.display = results.length ? 'none' : 'block';
+    // ✅ CRITICAL: render ONLY from 2nd result onward (prevents Gatsby appearing twice)
+    results.forEach((b, idx) => {
+      if (idx === 0) return;
 
-    results.forEach((b) => {
       const row = document.createElement('div');
-      row.className = 'dd-row';
+      row.className = 'row';
       row.tabIndex = 0;
 
       const cover = (b.cover || '').trim() || PLACEHOLDER;
 
-      row.innerHTML = `
-        <div class="dd-thumb"><img src="${cover}" alt="" onerror="this.src='${PLACEHOLDER}'"></div>
-        <div class="dd-meta">
-          <div class="dd-title">${escapeHtml(b.title || '')}</div>
-          <div class="dd-sub">${escapeHtml(b.author || '')}</div>
-        </div>
-      `;
+      // Build the row from elements instead of an HTML string. textContent
+      // and img.src treat book data as plain text, so a title or cover link
+      // can never be run as code (this closes an XSS hole).
+      const thumb = document.createElement('div');
+      thumb.className = 'thumb';
+      const img = document.createElement('img');
+      img.src = cover;
+      img.alt = '';
+      img.addEventListener('error', () => { img.src = PLACEHOLDER; }, { once: true });
+      thumb.appendChild(img);
+
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      const titleEl = document.createElement('div');
+      titleEl.className = 'title';
+      titleEl.textContent = b.title || '';
+      const subEl = document.createElement('div');
+      subEl.className = 'sub';
+      subEl.textContent = b.author || '';
+      meta.append(titleEl, subEl);
+
+      row.append(thumb, meta);
+      // The chevron icon is fixed markup with no book data in it, so inserting it as HTML is safe.
+      row.insertAdjacentHTML('beforeend', CHEVRON_SVG);
 
       row.addEventListener('click', () => selectBook(b));
-      row.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') selectBook(b);
-      });
+      row.addEventListener('keydown', (e) => { if (e.key === 'Enter') selectBook(b); });
 
       ddList.appendChild(row);
     });
@@ -245,51 +445,44 @@
     openDropdown();
   }
 
-  function selectBook(b) {
+  function selectBook(b){
+    selectedCard.style.display = 'block';
     selTitle.textContent = b.title || '';
     selAuthor.textContent = b.author || '';
     selCover.src = (b.cover || '').trim() || PLACEHOLDER;
+    selCover.onerror = () => { selCover.src = PLACEHOLDER; };
 
-    selected.classList.add('show');
+    const r = (b.rating ?? b.avg_rating ?? '');
+    selAvg.textContent = r ? `${Number(r).toFixed(2)} avg rating` : '';
+
     bookTitleField.value = b.title || '';
-
+    bookIdField.value = b.id || '';
     closeDropdown();
     input.value = '';
     input.blur();
   }
 
-  clearSel.addEventListener('click', () => {
-    selected.classList.remove('show');
-    bookTitleField.value = '';
-    input.focus();
-    renderList('');
+  // ✅ Only open dropdown when typing
+  input.addEventListener('focus', () => {
+    if (input.value.trim().length >= 1) renderList(input.value);
   });
-
-  // Open dropdown on focus/click (even with empty input)
-  input.addEventListener('focus', () => renderList(input.value));
-  input.addEventListener('click', () => renderList(input.value));
-  input.addEventListener('input', (e) => renderList(e.target.value));
-
-  // Keyboard helpers for search input
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      closeDropdown();
-      return;
-    }
-    if (e.key === 'Enter') {
-      // If user presses Enter, select the first result (if exists)
-      if (dd.classList.contains('open') && lastResults.length) {
-        e.preventDefault();
-        selectBook(lastResults[0]);
-      }
-    }
+  input.addEventListener('click', () => {
+    if (input.value.trim().length >= 1) renderList(input.value);
+  });
+  input.addEventListener('input', (e) => {
+    const v = e.target.value || '';
+    // Wait until typing pauses for 200 ms, so we don't search on every key press.
+    clearTimeout(searchTimer);
+    if (v.trim().length >= 1) searchTimer = setTimeout(() => renderList(v), 200);
+    else closeDropdown();
   });
 
   document.addEventListener('click', (e) => {
-    if (!dd.contains(e.target) && e.target !== input) closeDropdown();
+    const inCard = e.target.closest('.card');
+    if (!inCard && e.target !== input) closeDropdown();
   });
 
-  // Actions
+  // Buttons
   clearBtn.addEventListener('click', () => {
     reviewText.value = '';
     rating = 0;
@@ -297,21 +490,13 @@
   });
 
   submitBtn.addEventListener('click', () => {
-    if (!bookTitleField.value) {
-      input.focus();
-      renderList(input.value);
-      return;
-    }
+    if (!bookTitleField.value) { input.focus(); return; }
 
     const text = (reviewText.value || '').trim();
-    if (!text) {
-      reviewText.focus();
-      return;
-    }
+    if (!text) { reviewText.focus(); return; }
 
-    // require a rating 
     if (!rating) {
-      document.getElementById('starRow').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      document.getElementById('starRow').scrollIntoView({ behavior:'smooth', block:'center' });
       return;
     }
 
@@ -319,14 +504,5 @@
     ratingField.value = rating;
     document.getElementById('postForm').submit();
   });
-
-  function escapeHtml(s) {
-    return String(s || '')
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;')
-      .replaceAll("'", '&#039;');
-  }
 </script>
 {% endblock %}

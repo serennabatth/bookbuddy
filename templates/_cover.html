@@ -1,0 +1,25 @@
+{#
+  One book cover, used by every page that shows books.
+
+  It always draws a "tile" (a solid colour with the title and author) and,
+  when the book has cover art, puts the real image on top of it. So if the
+  image is missing or fails to load, the tile underneath simply shows instead.
+
+  Usage:  {% from "_cover.html" import book_cover %}
+          {{ book_cover(book) }}            regular size
+          {{ book_cover(book, "sm") }}      small tiles (smaller title text)
+          {{ book_cover(book, "art") }}     the large cover on a book's own page
+#}
+{% macro book_cover(b, variant="") -%}
+{%- set palette = ["#2F4A3A", "#7A2E2A", "#23324A", "#5A3550", "#2E5A5A", "#4A4A48", "#6B4A2B", "#3E3A5C"] -%}
+{%- set has_art = b.cover and "placehold.co" not in b.cover -%}
+<div class="book-cover {{ variant }}" role="img" aria-label="Cover of {{ b.title }}{% if b.author %} by {{ b.author }}{% endif %}">
+  <div class="book-cover-tile" style="background: {{ palette[(b.id or 0) % (palette|length)] }}" aria-hidden="true">
+    <span class="book-cover-title">{{ b.title }}</span>
+    <span class="book-cover-author">{{ b.author }}</span>
+  </div>
+  {%- if has_art %}
+  <img class="book-cover-art" src="{{ b.cover }}" alt="" loading="lazy" onerror="this.remove()">
+  {%- endif %}
+</div>
+{%- endmacro %}

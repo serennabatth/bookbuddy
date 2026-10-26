@@ -102,32 +102,6 @@
   <!-- Preferences -->
   <div class="sect-title">PREFERENCES</div>
   <div class="list">
-    <!-- Notifications -->
-    <div class="row">
-      <div class="row-left">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <path d="M10 21h4"/><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/></svg>
-        <div>
-          <div class="label">Notifications</div>
-          <div class="sub">Enable/disable push notifications</div>
-        </div>
-      </div>
-      <label class="switch" aria-label="Notifications">
-        <input type="checkbox" id="notifToggle">
-        <span class="slider"></span>
-      </label>
-    </div>
-
-    <!-- Language -->
-    <a class="row" href="{{ url_for('language_settings') }}">
-      <div class="row-left">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <path d="M4.5 10h15"/><path d="M4.5 14h15"/><path d="M9 18h6"/><path d="M10 6h4"/></svg>
-        <div class="label">Language</div>
-      </div>
-      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6"/></svg>
-    </a>
-
     <!-- Dark Mode -->
     <div class="row">
       <div class="row-left">
@@ -178,7 +152,8 @@
       <p>Are you sure you want to log out of your account?</p>
       <div class="modal-buttons">
         <button class="cancel" type="button" onclick="closeLogoutModal()">Cancel</button>
-        <form id="logoutForm" action="{{ url_for('logout') }}" method="get" style="display:inline;">
+        <form id="logoutForm" action="{{ url_for('logout') }}" method="post" style="display:inline;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button class="confirm" type="submit">Log out</button>
         </form>
       </div>
@@ -190,14 +165,5 @@
   function confirmLogout(){ document.getElementById('logoutModal').style.display = 'flex'; }
   function closeLogoutModal(){ document.getElementById('logoutModal').style.display = 'none'; }
 
-  (function(){
-    const nKey = 'bb_notifications';
-    const n = document.getElementById('notifToggle');
-    if(n){
-      const saved = localStorage.getItem(nKey);
-      if(saved !== null) n.checked = (saved === 'on');
-      n.addEventListener('change', () => localStorage.setItem(nKey, n.checked ? 'on' : 'off'));
-    }
-  })();
 </script>
 {% endblock %}
