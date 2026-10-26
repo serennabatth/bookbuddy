@@ -2,14 +2,16 @@
 import pytest
 
 import main
-from main import Book, Favourite, Review, User, db
+from app.extensions import db
+from app.models import Book, Favourite, Review, User
+from app.services import openlibrary
 
 
 @pytest.fixture(autouse=True)
 def no_open_library(monkeypatch):
     """Never call the real Open Library from tests."""
-    monkeypatch.setattr(main, "_ol_best_match", lambda *args, **kwargs: {})
-    monkeypatch.setattr(main, "_ol_description_for", lambda *args, **kwargs: "")
+    monkeypatch.setattr(openlibrary, "best_match", lambda *args, **kwargs: {})
+    monkeypatch.setattr(openlibrary, "description_for", lambda *args, **kwargs: "")
 
 
 def add_books(*pairs, genre="Classics"):
@@ -91,7 +93,7 @@ def test_search_api_returns_at_most_eight_matches_with_ids(client, app):
 
 def test_description_is_fetched_once_then_stored(client, app, monkeypatch):
     calls = []
-    monkeypatch.setattr(main, "_ol_description_for",
+    monkeypatch.setattr(openlibrary, "description_for",
                         lambda *args, **kwargs: calls.append(1) or "A vampire story.")
     (book,) = add_books(("Dracula", "Bram Stoker"))
 

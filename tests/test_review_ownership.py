@@ -1,13 +1,14 @@
 """Tests that you can edit and delete your own reviews, and nobody else's."""
 import pytest
 
-import main
-from main import Book, Review, User, db
+from app.extensions import db
+from app.models import Book, Review, User
+from app.services import openlibrary
 
 
 @pytest.fixture(autouse=True)
 def no_open_library(monkeypatch):
-    monkeypatch.setattr(main, "_ol_description_for", lambda *args, **kwargs: "")
+    monkeypatch.setattr(openlibrary, "description_for", lambda *args, **kwargs: "")
 
 
 def make_user(email):

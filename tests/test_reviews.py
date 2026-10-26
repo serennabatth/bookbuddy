@@ -2,14 +2,15 @@
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-import main
-from main import Book, Review, User, db
+from app.extensions import db
+from app.models import Book, Review, User
+from app.services import openlibrary
 
 
 @pytest.fixture(autouse=True)
 def no_open_library(monkeypatch):
     """Book pages fetch a description from Open Library; use a fake one in tests."""
-    monkeypatch.setattr(main, "_ol_description_for", lambda *args, **kwargs: "")
+    monkeypatch.setattr(openlibrary, "description_for", lambda *args, **kwargs: "")
 
 
 @pytest.fixture

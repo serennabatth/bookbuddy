@@ -1,8 +1,10 @@
 """Tests for adding books safely."""
 import pytest
 
-import main
-from main import Book, safe_cover_url
+from app.models import Book
+from app.services import openlibrary
+from app.services.catalogue import PLACEHOLDER_COVER
+from app.services.security import safe_cover_url
 
 
 @pytest.fixture(autouse=True)
@@ -12,7 +14,7 @@ def no_open_library(monkeypatch):
     monkeypatch swaps the function for a fake one during each test, so the
     tests are fast, work offline and always get the same answer.
     """
-    monkeypatch.setattr(main, "_ol_best_match", lambda *args, **kwargs: {})
+    monkeypatch.setattr(openlibrary, "best_match", lambda *args, **kwargs: {})
 
 
 def log_in(client):
@@ -46,4 +48,4 @@ def test_add_book_drops_an_unsafe_cover(client):
     book = Book.query.filter_by(title="Test Book").first()
     assert book is not None
     assert "onerror" not in book.cover
-    assert book.cover == main.PLACEHOLDER_COVER
+    assert book.cover == PLACEHOLDER_COVER

@@ -6,33 +6,36 @@ from flask_login import login_user, login_required, current_user, logout_user
 from flask_wtf.csrf import CSRFError
 from io import BytesIO
 import qrcode
-from PIL import Image, UnidentifiedImageError
 import qrcode.image.pil  # ensure PIL backend available
 import os
-import re
-import secrets
-import threading
-import time
-from collections import defaultdict, deque
-from datetime import datetime
-from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
-from sqlalchemy import func, or_
-from urllib.parse import quote, urlparse
-from urllib.request import urlopen, Request
-import json
-from dataclasses import dataclass
 import csv
 import click
+from datetime import datetime
+from sqlalchemy import func
 
 from app.config import get_config
 from app.extensions import csrf, db, login_manager, migrate
-from app.models import Book, Favourite, Follow, History, Review, User  # noqa: F401
+from app.models import Book, Favourite, Follow, History, Review, User
+from app.services import openlibrary
+from app.services.avatars import delete_avatar_file, save_avatar
+from app.services.catalogue import (
+    GENRES, PLACEHOLDER_COVER, SORT_OPTIONS,
+    average_rating, book_dict, books_with_ratings, paginate_books, ratings_for,
+)
+from app.services.security import (
+    generate_reset_token, password_problem, rate_limited, safe_cover_url,
+    safe_next_url, verify_reset_token,
+)
+from app.services.users import (
+    HANDLE_RULES, display_name, follow_counts, handle_taken, is_following,
+    normalize_handle, toggle_follow,
+)
 
 
 # -----------------------------------------------------------------------------
 # App & DB
 # -----------------------------------------------------------------------------
-# config, extensions and models are in the app/ folder
+# config, extensions, models and services are in the app/ folder
 app = Flask(__name__)
 
 config_class = get_config()
@@ -64,43 +67,8 @@ def handle_csrf_error(error: CSRFError):
 
 
 # -----------------------------------------------------------------------------
-# Demo Data 
-# -----------------------------------------------------------------------------
-# The 9 hard-coded demo books that used to live here were moved into the
-# database by the migration in Phase 3 task 4.
-
-GENRES = [
-    "Romance", "Fantasy", "Horror", "Mystery", "Non-fiction",
-    "Sci-Fi", "Classics", "Dystopian", "Gothic", "Literary", "Adventure"
-]
-
-# -----------------------------------------------------------------------------
 # Helpers
 # -----------------------------------------------------------------------------
-HANDLE_PATTERN = re.compile(r"[a-z0-9_.]{3,30}")
-
-
-def normalize_handle(raw: str) -> str | None:
-    """Turn what someone typed into a stored handle, e.g. " Alex.Morgan " -> "@alex.morgan".
-
-    Returns None if it isn't valid: 3-30 characters, only letters,
-    numbers, dots and underscores.
-    """
-    body = (raw or "").strip().lstrip("@").lower()
-    return f"@{body}" if HANDLE_PATTERN.fullmatch(body) else None
-
-
-def handle_taken(handle: str, except_user_id: int | None = None) -> bool:
-    """True if another account already uses this handle."""
-    query = User.query.filter_by(handle=handle)
-    if except_user_id is not None:
-        query = query.filter(User.id != except_user_id)
-    return query.first() is not None
-
-
-HANDLE_RULES = "Handles are 3-30 characters: letters, numbers, dots and underscores."
-
-
 def current_user_name() -> str:
     if current_user.is_authenticated and current_user.name:
         return current_user.name
@@ -111,319 +79,6 @@ def current_user_handle() -> str:
     if current_user.is_authenticated and current_user.handle:
         return current_user.handle
     return ""
-
-
-PASSWORD_MIN_LENGTH = 8
-
-
-def password_problem(password: str) -> str | None:
-    """What's wrong with a new password, or None if it's fine.
-
-    Length matters far more than forced symbols (this follows current UK NCSC
-    and US NIST advice), so the rule is simply 8 to 128 characters.
-    """
-    if len(password or "") < PASSWORD_MIN_LENGTH:
-        return f"Passwords must be at least {PASSWORD_MIN_LENGTH} characters."
-    if len(password) > 128:
-        return "Passwords can be at most 128 characters."
-    return None
-
-
-def _reset_serializer():
-    return URLSafeTimedSerializer(app.config["SECRET_KEY"], salt="password-reset")
-
-
-def generate_reset_token(user) -> str:
-    """A signed link token for resetting this user's password.
-
-    It includes a fingerprint of the current password hash. As soon as the
-    password changes, the fingerprint stops matching, so each link works once.
-    """
-    return _reset_serializer().dumps({"email": user.email, "pw": user.password_hash[-16:]})
-
-
-def verify_reset_token(token: str, max_age_seconds: int = 3600):
-    """The user a reset token belongs to, or None if it's invalid, expired or already used."""
-    try:
-        data = _reset_serializer().loads(token, max_age=max_age_seconds)
-    except (SignatureExpired, BadSignature):
-        return None
-    if not isinstance(data, dict):
-        return None   # an old-style link from before tokens were single-use
-    user = User.query.filter_by(email=data.get("email")).first()
-    if user is None or user.password_hash[-16:] != data.get("pw"):
-        return None
-    return user
-
-
-class RateLimiter:
-    """Allows at most `limit` attempts per `window` seconds for each key (e.g. one IP address).
-
-    It remembers the time of each recent attempt and forgets ones older than
-    the window ("sliding window"). Kept in memory, so it resets when the
-    server restarts; a large site would keep these counts in Redis instead.
-    """
-
-    def __init__(self) -> None:
-        self._attempts: dict[str, deque] = defaultdict(deque)
-        self._lock = threading.Lock()
-
-    def allow(self, key: str, limit: int, window: float) -> bool:
-        now = time.monotonic()
-        with self._lock:
-            attempts = self._attempts[key]
-            while attempts and now - attempts[0] > window:
-                attempts.popleft()
-            if len(attempts) >= limit:
-                return False
-            attempts.append(now)
-            return True
-
-    def reset(self) -> None:
-        with self._lock:
-            self._attempts.clear()
-
-
-rate_limiter = RateLimiter()
-
-
-def rate_limited(action: str, limit: int, window: float) -> bool:
-    """True if this visitor has tried `action` too often recently."""
-    if not app.config.get("RATE_LIMITS_ENABLED", True):
-        return False
-    return not rate_limiter.allow(f"{action}:{request.remote_addr}", limit, window)
-
-
-def safe_next_url(target: str | None) -> str | None:
-    """Only allow redirects to pages on this site after login.
-
-    Without this check, a link like /login?next=https://evil.example could
-    send someone to a fake site straight after they log in ("open redirect").
-    """
-    if not target or not target.startswith("/") or target.startswith("//") or "\\" in target:
-        return None
-    return target
-
-
-PLACEHOLDER_COVER = "https://placehold.co/400x600/EEE/AAA?text=No+Cover"
-
-
-def safe_cover_url(url: str) -> str:
-    """Return the URL only if it is a plain https:// web address, else "".
-
-    Cover links can come from users, so anything else (javascript:, data:,
-    text with quotes or angle brackets) is thrown away before it is saved
-    or shown.
-    """
-    url = (url or "").strip()
-    if not url or any(ch in url for ch in "\"'<> "):
-        return ""
-    parsed = urlparse(url)
-    if parsed.scheme != "https" or not parsed.netloc:
-        return ""
-    return url
-
-
-def _ol_cover_url(cover_i: str = "", isbn: str = "", olid: str = "") -> str:
-    """Build an Open Library cover URL from the best identifier we have.
-
-    Priority: cover id, then ISBN, then edition id. "?default=false" makes
-    Open Library return an error instead of a blank 1x1 image when it has no
-    cover, so the page can show the title-and-author tile instead.
-    """
-    cover_i = (cover_i or "").strip()
-    isbn = (isbn or "").strip()
-    olid = (olid or "").strip()
-
-    if cover_i:
-        return f"https://covers.openlibrary.org/b/id/{cover_i}-L.jpg?default=false"
-    if isbn:
-        return f"https://covers.openlibrary.org/b/isbn/{isbn}-L.jpg?default=false"
-    if olid:
-        return f"https://covers.openlibrary.org/b/olid/{olid}-L.jpg?default=false"
-    return ""
-
-
-def _ol_get_json(url: str, timeout: int = 15):
-    """GET a JSON document from Open Library, or None if anything goes wrong."""
-    req = Request(url, headers={"User-Agent": "BookBuddy/1.0 (personal project)"})
-    try:
-        with urlopen(req, timeout=timeout) as resp:
-            return json.loads(resp.read().decode("utf-8"))
-    except Exception:
-        return None
-
-
-def _score_search_result(doc: dict, title: str, author: str) -> int:
-    """How well one Open Library search result matches the book we want.
-
-    Title and author matter most. After that, prefer English-language works
-    and works with many editions, which are usually the well-known version
-    rather than a translation or an obscure reprint.
-    """
-    t_low, a_low = title.strip().lower(), author.strip().lower()
-    score = 0
-
-    d_title = (doc.get("title") or "").strip().lower()
-    if d_title == t_low:
-        score += 50
-    elif t_low and t_low in d_title:
-        score += 25
-
-    authors = doc.get("author_name") or []
-    first_author = (authors[0] or "").strip().lower() if authors else ""
-    if a_low and first_author:
-        if first_author == a_low:
-            score += 50
-        elif a_low in first_author or first_author in a_low:
-            score += 25
-
-    if doc.get("cover_i"):
-        score += 10
-    if "eng" in (doc.get("language") or []):
-        score += 20
-    score += min(int(doc.get("edition_count") or 0), 100) // 5   # up to +20
-
-    return score
-
-
-def pick_best_search_result(docs: list, title: str, author: str = "") -> dict | None:
-    """The search result that best matches (title, author), or None if there are none."""
-    if not docs:
-        return None
-    return max(docs, key=lambda doc: _score_search_result(doc, title, author))
-
-
-def _english_edition_cover(work_key: str) -> str:
-    """The cover id of an English edition of this work, or "" if there isn't one.
-
-    A work's default cover is sometimes a translation's, e.g. a French
-    "Une brève histoire du temps" for A Brief History of Time.
-    """
-    if not (work_key or "").startswith("/works/"):
-        return ""
-    data = _ol_get_json(f"https://openlibrary.org{work_key}/editions.json?limit=100") or {}
-    for edition in data.get("entries") or []:
-        languages = {lang.get("key") for lang in edition.get("languages") or []}
-        covers = [c for c in edition.get("covers") or [] if isinstance(c, int) and c > 0]
-        if "/languages/eng" in languages and covers:
-            return str(covers[0])
-    return ""
-
-
-def _ol_best_match(title: str, author: str = "", timeout: int = 15) -> dict:
-    """Look a book up on Open Library.
-
-    Returns {cover, cover_i, isbn, olid, year}, or {} if nothing was found
-    or Open Library couldn't be reached.
-    """
-    t = (title or "").strip()
-    a = (author or "").strip()
-    if not t:
-        return {}
-
-    fields = "key,title,author_name,cover_i,isbn,edition_key,first_publish_year,language,edition_count"
-    q = t if not a else f"{t} {a}"
-    data = _ol_get_json(
-        f"https://openlibrary.org/search.json?q={quote(q)}&limit=20&fields={fields}", timeout=timeout
-    ) or {}
-    best = pick_best_search_result(data.get("docs") or [], t, a)
-    if best is None:
-        return {}
-
-    cover_i = _english_edition_cover(best.get("key") or "") or str(best.get("cover_i") or "").strip()
-    olid = str((best.get("edition_key") or [""])[0] or "").strip()
-    isbn = str((best.get("isbn") or [""])[0] or "").strip()
-    year = str(best["first_publish_year"]) if isinstance(best.get("first_publish_year"), int) else ""
-
-    cover = _ol_cover_url(cover_i=cover_i, isbn=isbn, olid=olid)
-    return {"cover": cover, "cover_i": cover_i, "isbn": isbn, "olid": olid, "year": year}
-
-
-BOOKS_PER_PAGE = 24
-SORT_OPTIONS = {
-    "rating": "Highest rated",
-    "reviews": "Most reviewed",
-    "title": "Title A–Z",
-    "newest": "Newest added",
-}
-
-
-def books_with_ratings(q: str = "", genre: str = "", sort: str = "rating", rated_only: bool = False):
-    """A database query for books plus each one's average rating and review count.
-
-    Everything (searching, filtering, sorting) happens in the database,
-    so only the books on the current page are ever loaded into Python.
-    """
-    avg_rating = func.coalesce(func.avg(Review.rating), 0.0).label("avg_rating")
-    review_count = func.count(Review.id).label("review_count")
-    stmt = (
-        db.select(Book, avg_rating, review_count)
-        .outerjoin(Review, Review.book_id == Book.id)
-        .group_by(Book.id)
-    )
-    if genre:
-        stmt = stmt.where(func.lower(Book.genre) == genre.lower())
-    if q:
-        # autoescape: a % or _ typed by the user is searched for literally.
-        needle = q.lower()
-        stmt = stmt.where(or_(
-            func.lower(Book.title).contains(needle, autoescape=True),
-            func.lower(Book.author).contains(needle, autoescape=True),
-        ))
-    if rated_only:
-        stmt = stmt.having(func.count(Review.id) > 0)
-    order = {
-        "rating": (avg_rating.desc(), review_count.desc(), Book.title),
-        "reviews": (review_count.desc(), Book.title),
-        "title": (Book.title,),
-        "newest": (Book.id.desc(),),
-    }.get(sort, (avg_rating.desc(), review_count.desc(), Book.title))
-    return stmt.order_by(*order)
-
-
-@dataclass
-class BookPage:
-    """One page of results, with what the template needs for page links."""
-    items: list
-    page: int
-    total: int
-    per_page: int = BOOKS_PER_PAGE
-
-    @property
-    def pages(self) -> int:
-        return max(1, -(-self.total // self.per_page))  # rounds up
-
-    @property
-    def has_prev(self) -> bool:
-        return self.page > 1
-
-    @property
-    def has_next(self) -> bool:
-        return self.page < self.pages
-
-
-def paginate_books(stmt, page: int) -> BookPage:
-    total = db.session.scalar(db.select(func.count()).select_from(stmt.order_by(None).subquery()))
-    page = min(max(page, 1), max(1, -(-total // BOOKS_PER_PAGE)))
-    rows = db.session.execute(stmt.limit(BOOKS_PER_PAGE).offset((page - 1) * BOOKS_PER_PAGE)).all()
-    return BookPage(
-        items=[_book_dict(bk, float(avg), count) for bk, avg, count in rows],
-        page=page,
-        total=total,
-    )
-
-
-def ratings_for(book_ids) -> dict:
-    """{book id: (average rating, review count)} for the given books, in one query."""
-    if not book_ids:
-        return {}
-    rows = db.session.execute(
-        db.select(Review.book_id, func.avg(Review.rating), func.count(Review.id))
-        .where(Review.book_id.in_(book_ids))
-        .group_by(Review.book_id)
-    ).all()
-    return {book_id: (float(avg), count) for book_id, avg, count in rows}
 
 
 def _page_number() -> int:
@@ -462,94 +117,6 @@ def _time_ago(dt: datetime) -> str:
     return f"{years}y ago"
 
 
-def _ol_description_for(title: str, author: str = "", timeout: int = 4) -> str | None:
-    """
-    Best-effort description from Open Library.
-    Uses search -> first work -> work details.
-    Falls back to empty string if anything fails.
-    """
-    t = (title or "").strip()
-    a = (author or "").strip()
-    if not t:
-        return ""
-
-    q = t if not a else f"{t} {a}"
-    search_url = f"https://openlibrary.org/search.json?q={quote(q)}&limit=5&page=1"
-    req = Request(search_url, headers={"User-Agent": "BookBuddy/1.0 (personal project)"})
-
-    try:
-        with urlopen(req, timeout=timeout) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-    except Exception:
-        return None  # network problem: try again next time
-
-    docs = data.get("docs") or []
-    if not docs:
-        return ""
-
-    # pick the most relevant doc (basic scoring like cover matcher)
-    t_low = t.lower()
-    a_low = a.lower()
-
-    def score(doc: dict) -> int:
-        s = 0
-        d_title = (doc.get("title") or "").strip().lower()
-        if d_title == t_low:
-            s += 50
-        elif t_low in d_title:
-            s += 25
-
-        authors = doc.get("author_name")
-        first_author = ""
-        if isinstance(authors, list) and authors:
-            first_author = (authors[0] or "").strip().lower()
-
-        if a_low and first_author:
-            if first_author == a_low:
-                s += 50
-            elif a_low in first_author or first_author in a_low:
-                s += 25
-
-        if doc.get("key"):
-            s += 5
-        return s
-
-    best = max(docs, key=score)
-
-    # Prefer work_key if present, else try from key (works can appear differently)
-    work_keys = best.get("work_key")
-    work_key = ""
-    if isinstance(work_keys, list) and work_keys:
-        work_key = str(work_keys[0] or "").strip()
-    if not work_key:
-        # sometimes docs have a "key" like "/works/OL..."
-        k = str(best.get("key") or "").strip()
-        if k.startswith("/works/"):
-            work_key = k
-
-    if not work_key:
-        return ""
-
-    work_url = f"https://openlibrary.org{work_key}.json"
-    req2 = Request(work_url, headers={"User-Agent": "BookBuddy/1.0 (personal project)"})
-    try:
-        with urlopen(req2, timeout=timeout) as resp:
-            work = json.loads(resp.read().decode("utf-8"))
-    except Exception:
-        return None  # network problem: try again next time
-
-    desc = work.get("description")
-    if isinstance(desc, dict):
-        desc = desc.get("value")
-    if isinstance(desc, str):
-        # keep it tidy for UI
-        desc = desc.strip()
-        if len(desc) > 600:
-            desc = desc[:600].rsplit(" ", 1)[0].rstrip() + "…"
-        return desc
-
-    return ""
-
 # -----------------------------------------------------------------------------
 # Seeding the catalogue
 # -----------------------------------------------------------------------------
@@ -575,10 +142,10 @@ def _apply_metadata(book: Book, meta: dict) -> None:
 
 def _metadata_for(title: str, author: str, cover_id: str = "") -> dict:
     """Open Library details, with a hand-picked cover id from books.csv winning if given."""
-    meta = _ol_best_match(title, author) or {}
+    meta = openlibrary.best_match(title, author) or {}
     if cover_id:
         meta["cover_i"] = cover_id
-        meta["cover"] = _ol_cover_url(cover_i=cover_id)
+        meta["cover"] = openlibrary.cover_url(cover_i=cover_id)
     return meta
 
 
@@ -646,9 +213,9 @@ def seed_command(reset: bool, refresh_covers: bool) -> None:
 def home():
     # Only books people have actually rated appear under "Top Rated".
     rows = db.session.execute(books_with_ratings(rated_only=True).limit(6)).all()
-    top_rated = [_book_dict(bk, float(avg), count) for bk, avg, count in rows]
+    top_rated = [book_dict(bk, float(avg), count) for bk, avg, count in rows]
     first_book = db.session.scalar(db.select(Book).order_by(Book.title).limit(1))
-    featured = top_rated[0] if top_rated else (_book_dict(first_book, 0.0) if first_book else {})
+    featured = top_rated[0] if top_rated else (book_dict(first_book, 0.0) if first_book else {})
     return render_template(
         "index.html",
         featured=featured,
@@ -673,35 +240,6 @@ def browse():
         sort=sort,
         sort_options=SORT_OPTIONS,
     )
-
-
-def _display_name(user) -> str:
-    """How a reviewer is shown: their handle, else their name, else "reader"."""
-    if not user:
-        return "reader"
-    if user.is_private:
-        return "A reader"   # private profiles aren't named on book pages
-    return (user.handle or user.name or "").strip() or "reader"
-
-
-def _book_dict(bk: Book, avg_rating: float, review_count: int = 0) -> dict:
-    """The shape the templates expect for one book."""
-    built = _ol_cover_url(cover_i=str(bk.cover_i or ""), isbn=str(bk.isbn or ""), olid=str(bk.olid or ""))
-    return {
-        "id": bk.id,
-        "title": bk.title,
-        "author": bk.author,
-        "genre": bk.genre or "Other",
-        "year": bk.year or "",
-        "cover": built or safe_cover_url(bk.cover) or PLACEHOLDER_COVER,
-        "rating": avg_rating,
-        "review_count": review_count,
-    }
-
-
-def _average_rating(book_id: int) -> float:
-    avg = db.session.query(func.avg(Review.rating)).filter(Review.book_id == book_id).scalar()
-    return float(avg or 0.0)
 
 
 @app.route("/book-details/<path:title>")
@@ -731,7 +269,7 @@ def book_details(book_id):
     reviews_for_template = [
         {
             "id": r.id,
-            "user": _display_name(r.user),
+            "user": display_name(r.user),
             "rating": r.rating,
             "text": (r.text or "").strip(),
             "age": _time_ago(r.created),
@@ -746,7 +284,7 @@ def book_details(book_id):
     # Fetched from Open Library once, then kept in the database.
     # Shown only when Open Library has one (the old made-up fallback text is gone).
     if bk.description is None:
-        fetched = _ol_description_for(bk.title, bk.author)
+        fetched = openlibrary.description_for(bk.title, bk.author)
         if fetched is not None:          # None means Open Library couldn't be reached
             bk.description = fetched     # may be "" if it has no description
             db.session.commit()
@@ -754,7 +292,7 @@ def book_details(book_id):
 
     return render_template(
         "book_details.html",
-        book=_book_dict(bk, _average_rating(bk.id)),
+        book=book_dict(bk, average_rating(bk.id)),
         book_id=bk.id,
         description=description,
         reviews=reviews_for_template,
@@ -768,7 +306,7 @@ def book_reviews(book_id):
     rows = Review.query.filter_by(book_id=bk.id).order_by(Review.created.desc()).all()
     reviews = [
         {
-            "user": _display_name(r.user),
+            "user": display_name(r.user),
             "rating": r.rating,
             "text": (r.text or "").strip(),
             "created": r.created,
@@ -777,9 +315,9 @@ def book_reviews(book_id):
     ]
     return render_template(
         "book_reviews.html",
-        book=_book_dict(bk, _average_rating(bk.id)),
+        book=book_dict(bk, average_rating(bk.id)),
         reviews=reviews,
-        avg_rating=_average_rating(bk.id),
+        avg_rating=average_rating(bk.id),
         review_count=len(rows),
     )
 
@@ -815,7 +353,7 @@ def add_review():
             flash("You've already reviewed this book.", "error")
             return redirect(url_for("book_details", book_id=bk.id))
 
-        cover = _book_dict(bk, 0.0)["cover"]
+        cover = book_dict(bk, 0.0)["cover"]
         db.session.add(Review(
             user_id=current_user.id,
             book_id=bk.id,
@@ -860,7 +398,7 @@ def edit_review(review_id):
         db.session.commit()
         flash("Review updated.", "ok")
         return redirect(url_for("book_details", book_id=review.book_id))
-    return render_template("edit_review.html", review=review, book=_book_dict(review.book, 0.0))
+    return render_template("edit_review.html", review=review, book=book_dict(review.book, 0.0))
 
 
 @app.post("/reviews/<int:review_id>/delete")
@@ -893,7 +431,7 @@ def add_book():
             flash("That book already exists.", "error")
             return redirect(url_for("add_review"))
 
-        meta = _ol_best_match(title, author) or {}
+        meta = openlibrary.best_match(title, author) or {}
         best_cover = safe_cover_url(meta.get("cover")) or cover or PLACEHOLDER_COVER
 
         b = Book(
@@ -1031,29 +569,6 @@ def top_rated():
 # ----------------------------
 # SOCIAL: Following / Followers
 # ----------------------------
-def is_following(follower_id: int, followed_id: int) -> bool:
-    return Follow.query.filter_by(follower_id=follower_id, followed_id=followed_id).first() is not None
-
-
-def follow_counts(user_id: int) -> tuple[int, int]:
-    """(followers, following) for one user."""
-    followers = Follow.query.filter_by(followed_id=user_id).count()
-    following = Follow.query.filter_by(follower_id=user_id).count()
-    return followers, following
-
-
-def toggle_follow(follower: User, target: User) -> bool:
-    """Follow target if not already following, otherwise unfollow. Returns True if now following."""
-    existing = Follow.query.filter_by(follower_id=follower.id, followed_id=target.id).first()
-    if existing:
-        db.session.delete(existing)
-        db.session.commit()
-        return False
-    db.session.add(Follow(follower_id=follower.id, followed_id=target.id))
-    db.session.commit()
-    return True
-
-
 def _people(users, q: str) -> list[dict]:
     """The shape the Followers and Following pages expect, filtered by an optional search."""
     q = (q or "").strip().lower()
@@ -1151,53 +666,7 @@ def api_openlibrary():
     q = (request.args.get("q") or "").strip()
     if not q:
         return jsonify([])
-
-    url = "https://openlibrary.org/search.json?q={}&limit=10".format(quote(q))
-
-    try:
-        req = Request(url, headers={"User-Agent": "BookBuddy/1.0 (personal project)"})
-        with urlopen(req, timeout=10) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-    except Exception:
-        return jsonify([])
-
-    results = []
-    for d in (data.get("docs") or []):
-        title = (d.get("title") or "").strip()
-        author = ""
-        if isinstance(d.get("author_name"), list) and d["author_name"]:
-            author = (d["author_name"][0] or "").strip()
-
-        year = ""
-        if isinstance(d.get("first_publish_year"), int):
-            year = str(d["first_publish_year"])
-
-        cover_i = str(d.get("cover_i") or "").strip()
-
-        isbn = ""
-        isbns = d.get("isbn")
-        if isinstance(isbns, list) and isbns:
-            isbn = str(isbns[0] or "").strip()
-
-        olid = ""
-        edition_keys = d.get("edition_key")
-        if isinstance(edition_keys, list) and edition_keys:
-            olid = str(edition_keys[0] or "").strip()
-
-        cover = _ol_cover_url(cover_i=cover_i, isbn=isbn, olid=olid)
-
-        if title and author:
-            results.append({
-                "title": title,
-                "author": author,
-                "year": year,
-                "cover": cover,
-                "cover_i": cover_i,
-                "isbn": isbn,
-                "olid": olid,
-            })
-
-    return jsonify(results)
+    return jsonify(openlibrary.search(q))
 
 
 # -----------------------------------------------------------------------------
@@ -1240,46 +709,6 @@ def my_reviews():
     )
     return render_template("my_reviews.html", reviews=reviews)
 
-
-
-AVATAR_FOLDER = os.path.join("uploads", "avatars")   # inside static/
-AVATAR_MAX_SIZE = (512, 512)
-Image.MAX_IMAGE_PIXELS = 25_000_000   # refuse "decompression bombs": tiny files that expand to huge images
-
-
-def save_avatar(file, user_id: int) -> str | None:
-    """Check an uploaded picture and save a clean copy. Returns its path inside static/, or None.
-
-    - Pillow must be able to open it as an image (the file name proves nothing).
-    - It's shrunk to at most 512x512 and re-saved as a fresh JPEG, which also
-      drops hidden metadata such as the GPS location a phone camera adds.
-    - The name is random, so nobody can guess or overwrite someone else's file.
-    """
-    try:
-        with Image.open(file.stream) as img:
-            img.load()
-            img = img.convert("RGB")
-            img.thumbnail(AVATAR_MAX_SIZE)
-            filename = f"user_{user_id}_{secrets.token_hex(8)}.jpg"
-            folder = os.path.join(app.static_folder, AVATAR_FOLDER)
-            os.makedirs(folder, exist_ok=True)
-            img.save(os.path.join(folder, filename), "JPEG", quality=85)
-    except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError):
-        return None
-    return f"{AVATAR_FOLDER.replace(os.sep, '/')}/{filename}"
-
-
-def _delete_avatar_file(path: str | None) -> None:
-    """Remove an old profile picture, but only if it really is one of ours."""
-    if not path or not path.startswith("uploads/avatars/"):
-        return
-    full = os.path.join(app.static_folder, *path.split("/"))
-    try:
-        os.remove(full)
-    except FileNotFoundError:
-        pass
-
-
 @app.errorhandler(413)
 def file_too_large(error):
     flash("That picture is too big. Please choose one under 2 MB.", "error")
@@ -1321,7 +750,7 @@ def edit_profile():
             if new_path is None:
                 flash("That file isn't a picture we can use. Try a JPG, PNG or WebP image.", "error")
                 return redirect(url_for("edit_profile"))
-            _delete_avatar_file(current_user.avatar)
+            delete_avatar_file(current_user.avatar)
             current_user.avatar = new_path
 
         db.session.commit()
@@ -1341,7 +770,7 @@ def share_profile():
             Review.query.filter_by(user_id=current_user.id)
             .order_by(Review.created.desc()).limit(10).all()
         )
-        books = [_book_dict(r.book, _average_rating(r.book_id)) for r in reviewed]
+        books = [book_dict(r.book, average_rating(r.book_id)) for r in reviewed]
     return render_template("share_profile.html", user=user, books=books)
 
 
@@ -1443,7 +872,7 @@ def api_search_books():
     if not q:
         return jsonify([])
     rows = db.session.execute(books_with_ratings(q=q, sort="title").limit(8)).all()
-    return jsonify([_book_dict(bk, float(avg), count) for bk, avg, count in rows])
+    return jsonify([book_dict(bk, float(avg), count) for bk, avg, count in rows])
 
 
 # -----------------------------------------------------------------------------
