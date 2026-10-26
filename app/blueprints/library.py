@@ -1,5 +1,5 @@
 """The reader's own lists - favourites and recently viewed."""
-from flask import Blueprint, abort, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, abort, g, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app.extensions import db
@@ -10,6 +10,21 @@ from app.services.shelves import SHELVES, set_shelf, shelf_book_dicts, shelf_cou
 from app.services.stats import reading_stats
 
 bp = Blueprint("library", __name__)
+
+
+def current_favourite_ids() -> set[int]:
+    """Ids of the logged-in user's favourite books (looked up once per request)."""
+    if not current_user.is_authenticated:
+        return set()
+    if "favourite_ids" not in g:
+        g.favourite_ids = {f.book_id for f in Favourite.query.filter_by(user_id=current_user.id).all()}
+    return g.favourite_ids
+
+
+@bp.app_context_processor
+def inject_favourite_ids():
+    # lets any template call favourite_ids() to show hearts on covers
+    return {"favourite_ids": current_favourite_ids}
 
 
 def _matches(book: Book, q: str) -> bool:
@@ -77,13 +92,12 @@ def shelf_page(status):
     """Every book on one shelf (the "See all" link)."""
     if status not in SHELVES:
         abort(404)
-    fav_ids = {f.book_id for f in Favourite.query.filter_by(user_id=current_user.id).all()}
     return render_template(
         "library_shelf.html",
         status=status,
         shelf_name=SHELVES[status],
         books=shelf_book_dicts(current_user.id, status),
-        favourite_ids=fav_ids,
+        favourite_ids=current_favourite_ids(),
     )
 
 

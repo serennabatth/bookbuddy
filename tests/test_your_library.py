@@ -57,7 +57,7 @@ def test_favourites_get_a_heart(client, reader):
     book = add_book("Rebecca")
     db.session.add(Favourite(user_id=reader.id, book_id=book.id))
     db.session.commit()
-    assert 'class="lib-heart"' in page(client)
+    assert 'class="book-cover-heart"' in page(client)
 
 
 def test_see_all_shelf_page(client, reader):
