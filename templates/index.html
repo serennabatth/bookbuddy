@@ -257,7 +257,7 @@
 <div class="wrap">
 
   <!-- Search (at top, like Figma) -->
-  <form class="f-search" action="{{ url_for('browse') }}" method="get">
+  <form class="f-search" action="{{ url_for('books.browse') }}" method="get">
     <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
       <circle cx="11" cy="11" r="7"></circle>
       <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
@@ -267,14 +267,14 @@
 
   <!-- Quick links chips row (under search, like Figma) -->
   <div class="chips" aria-label="Quick links">
-    <a class="chip" href="{{ url_for('favourites') }}">
+    <a class="chip" href="{{ url_for('library.favourites') }}">
       <svg class="cicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
         <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 1 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/>
       </svg>
       Favourites
     </a>
 
-    <a class="chip" href="{{ url_for('history') }}">
+    <a class="chip" href="{{ url_for('library.history') }}">
       <svg class="cicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
         <polyline points="1 4 1 10 7 10"></polyline>
         <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
@@ -283,7 +283,7 @@
       History
     </a>
 
-    <a class="chip" href="{{ url_for('following') }}">
+    <a class="chip" href="{{ url_for('social.following') }}">
       <svg class="cicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
         <path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
         <circle cx="12" cy="7" r="4"></circle>
@@ -291,7 +291,7 @@
       Following
     </a>
 
-    <a class="chip" href="{{ url_for('followers') }}">
+    <a class="chip" href="{{ url_for('social.followers') }}">
       <svg class="cicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
         <path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
         <circle cx="12" cy="7" r="4"></circle>
@@ -303,7 +303,7 @@
   <!-- Featured (hidden when the catalogue is empty, e.g. a fresh install before seeding) -->
   {% if featured %}
   <div class="h">Featured Book</div>
-  <a class="featured" href="{{ url_for('book_details', book_id=featured.id) }}">
+  <a class="featured" href="{{ url_for('books.book_details', book_id=featured.id) }}">
     <img
       src="{{ featured.cover }}"
       alt="{{ featured.title }}"
@@ -315,12 +315,12 @@
   <!-- Search by genre -->
   <div class="row-head" style="margin-top:18px;">
     <div class="title">Search By Genre</div>
-    <a class="seeall" href="{{ url_for('browse') }}">See all</a>
+    <a class="seeall" href="{{ url_for('books.browse') }}">See all</a>
   </div>
 
   <div class="genres" aria-label="Genres">
     {% for g in genres %}
-      <a class="g" href="{{ url_for('browse', genre=g) }}">
+      <a class="g" href="{{ url_for('books.browse', genre=g) }}">
         <div class="circle">
           {# If you pass a dict called genre_covers (genre -> image url), we'll use it. Otherwise fallback to a letter. #}
           {% if genre_covers is defined and genre_covers.get(g) %}
@@ -341,12 +341,12 @@
   <!-- Top rated -->
   <div class="row-head" style="margin-top:18px;">
     <div class="title">Top Rated Books</div>
-    <a class="seeall" href="{{ url_for('top_rated') }}">See all</a>
+    <a class="seeall" href="{{ url_for('books.top_rated') }}">See all</a>
   </div>
 
   <div class="grid">
     {% for b in top_rated %}
-      <a class="tile" href="{{ url_for('book_details', book_id=b.id) }}">
+      <a class="tile" href="{{ url_for('books.book_details', book_id=b.id) }}">
         {{ book_cover(b, "sm") }}
         <div class="meta">
           <div class="rating">{% if b.review_count %}{{ '%.1f'|format(b.rating) }} ★ · {{ b.review_count }} review{{ '' if b.review_count == 1 else 's' }}{% else %}No reviews yet{% endif %}</div>

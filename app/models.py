@@ -1,8 +1,8 @@
 """Database models.
 
 After changing a model, create and run a migration:
-    flask --app main db migrate -m "what changed"
-    flask --app main db upgrade
+    flask db migrate -m "what changed"
+    flask db upgrade
 """
 from datetime import datetime
 

@@ -27,7 +27,7 @@
   .h1{ text-align:center; }
 </style>
 
-  <a class="navicon" href="{{ url_for('home') }}" aria-label="Back">
+  <a class="navicon" href="{{ url_for('books.home') }}" aria-label="Back">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <polyline points="15 18 9 12 15 6"></polyline>
     </svg>
@@ -190,7 +190,7 @@
   {% set ql = q | lower %}
 
   <!-- search -->
-  <form class="f-search" action="{{ url_for('browse') }}" method="get">
+  <form class="f-search" action="{{ url_for('books.browse') }}" method="get">
     <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <circle cx="11" cy="11" r="7"></circle>
       <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
@@ -206,16 +206,16 @@
   <!-- genre pills (ONLY extra vs favourites) -->
   <div class="filters" aria-label="Genres">
     <a class="filter {% if not request.args.get('genre') %}active{% endif %}"
-       href="{{ url_for('browse', q=request.args.get('q','')) }}">All</a>
+       href="{{ url_for('books.browse', q=request.args.get('q','')) }}">All</a>
 
     {% for g in genres %}
       <a class="filter {% if request.args.get('genre','')|lower == g|lower %}active{% endif %}"
-         href="{{ url_for('browse', genre=g, q=request.args.get('q','')) }}">{{ g }}</a>
+         href="{{ url_for('books.browse', genre=g, q=request.args.get('q','')) }}">{{ g }}</a>
     {% endfor %}
   </div>
 
   <!-- count + sort (the database does the filtering and sorting) -->
-  <form method="get" action="{{ url_for('browse') }}"
+  <form method="get" action="{{ url_for('books.browse') }}"
         style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin:12px 0; font-size:14px;">
     <span aria-live="polite">{{ results.total }} book{{ '' if results.total == 1 else 's' }}</span>
     {% if request.args.get('q') %}<input type="hidden" name="q" value="{{ request.args.get('q') }}">{% endif %}
@@ -234,7 +234,7 @@
   {% if books %}
     <div class="f-grid">
       {% for b in books %}
-        <a class="f-tile" href="{{ url_for('book_details', book_id=b.id) }}">
+        <a class="f-tile" href="{{ url_for('books.book_details', book_id=b.id) }}">
           {{ book_cover(b) }}
           <div class="f-meta">
             <div class="f-rating">{% if b.review_count %}{{ '%.1f'|format(b.rating) }} ★ · {{ b.review_count }} review{{ '' if b.review_count == 1 else 's' }}{% else %}No reviews yet{% endif %}</div>
@@ -261,7 +261,7 @@
       <div class="t">No books found</div>
       <div>Try a different search, or clear the genre filter.</div>
       <div style="margin-top:12px;">
-        <a class="button" href="{{ url_for('browse') }}" style="height:40px;">Reset</a>
+        <a class="button" href="{{ url_for('books.browse') }}" style="height:40px;">Reset</a>
       </div>
     </div>
   {% endif %}

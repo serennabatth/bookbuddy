@@ -1,7 +1,7 @@
 """Tests for choosing covers and showing them."""
 import pytest
 
-import main
+from app import cli
 from app.extensions import db
 from app.models import Book
 from app.services import openlibrary
@@ -32,7 +32,7 @@ def seed_file(tmp_path, monkeypatch):
     def write(text):
         path = tmp_path / "books.csv"
         path.write_text(text, encoding="utf-8")
-        monkeypatch.setattr(main, "SEED_FILE", str(path))
+        monkeypatch.setattr(cli, "SEED_FILE", str(path))
     return write
 
 

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block appbar %}
-  <a class="navicon" href="{{ url_for('settings') }}" aria-label="Back">
+  <a class="navicon" href="{{ url_for('settings.index') }}" aria-label="Back">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <polyline points="15 18 9 12 15 6"></polyline>
     </svg>
@@ -24,7 +24,7 @@
 </style>
 
 <div class="page">
-  <form class="group" method="post" action="{{ url_for('privacy_settings') }}">
+  <form class="group" method="post" action="{{ url_for('settings.privacy_settings') }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="row">
       <div>

@@ -22,7 +22,7 @@ migrate = Migrate(render_as_batch=True)
 csrf = CSRFProtect()
 
 login_manager = LoginManager()
-login_manager.login_view = "login"  # redirect here if login is required
+login_manager.login_view = "auth.login"  # redirect here if login is required
 
 
 @event.listens_for(Engine, "connect")

@@ -1,32 +1,23 @@
-"""Shared test setup.
+"""Shared test setup."""
+import pytest
 
-These env vars are set before main.py is imported so the tests use an
-in-memory database and never touch instance/bookbuddy.db.
-"""
-import os
-
-os.environ["BOOKBUDDY_ENV"] = "testing"
-os.environ["SECRET_KEY"] = "test-secret-key"
-os.environ["DATABASE_URL"] = "sqlite://"  # in-memory SQLite
-
-import pytest  # noqa: E402
-
-from main import app as flask_app  # noqa: E402
-from app.extensions import db  # noqa: E402
-from app.services import openlibrary  # noqa: E402
+from app import create_app
+from app.extensions import db
+from app.services import openlibrary
 
 
 @pytest.fixture
 def app():
-    """Fresh empty database for each test.
+    """A new app with an empty in-memory database for each test.
 
     CSRF is turned off so tests can post forms directly
     (test_csrf.py turns it back on to check it works).
     """
-    flask_app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)
-    with flask_app.app_context():
+    app = create_app("testing")
+    app.config.update(WTF_CSRF_ENABLED=False)
+    with app.app_context():
         db.create_all()
-        yield flask_app
+        yield app
         db.session.remove()
         db.drop_all()
 

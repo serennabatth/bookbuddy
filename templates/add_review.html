@@ -25,7 +25,7 @@
   .h1{ text-align:center; }
 </style>
 
-  <a class="navicon" href="{{ url_for('home') }}" aria-label="Back">
+  <a class="navicon" href="{{ url_for('books.home') }}" aria-label="Back">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <polyline points="15 18 9 12 15 6"></polyline>
     </svg>
@@ -241,7 +241,7 @@
       </div>
 
       <!-- ✅ This stays on the page, BUT we hide it while dropdown is open -->
-      <a id="addBookRow" class="row" href="{{ url_for('add_book') }}">
+      <a id="addBookRow" class="row" href="{{ url_for('books.add_book') }}">
         <div class="thumb" aria-hidden="true">
           <svg class="plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -297,7 +297,7 @@
   </div>
 
   <!-- hidden real post form -->
-  <form id="postForm" action="{{ url_for('add_review') }}" method="post" style="display:none;">
+  <form id="postForm" action="{{ url_for('reviews.add_review') }}" method="post" style="display:none;">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="book_title" id="bookTitle">
     <input type="hidden" name="book_id" id="bookId">

@@ -1,7 +1,7 @@
 """Tests for the catalogue: browsing, searching, Top Rated, pagination and seeding."""
 import pytest
 
-import main
+from app import cli
 from app.extensions import db
 from app.models import Book, Favourite, Review, User
 from app.services import openlibrary
@@ -107,7 +107,7 @@ def test_description_is_fetched_once_then_stored(client, app, monkeypatch):
 def test_seed_adds_curated_books_once_and_fixes_genres(app, tmp_path, monkeypatch):
     csv_file = tmp_path / "books.csv"
     csv_file.write_text("title,author,genre\nDune,Frank Herbert,Sci-Fi\nEmma,Jane Austen,Romance\n", encoding="utf-8")
-    monkeypatch.setattr(main, "SEED_FILE", str(csv_file))
+    monkeypatch.setattr(cli, "SEED_FILE", str(csv_file))
     add_books(("Emma", "Jane Austen"), genre="Horror")   # already there, wrong genre
     runner = app.test_cli_runner()
 
@@ -121,7 +121,7 @@ def test_seed_adds_curated_books_once_and_fixes_genres(app, tmp_path, monkeypatc
 def test_seed_reset_keeps_books_people_have_used(app, tmp_path, monkeypatch):
     csv_file = tmp_path / "books.csv"
     csv_file.write_text("title,author,genre\nDune,Frank Herbert,Sci-Fi\n", encoding="utf-8")
-    monkeypatch.setattr(main, "SEED_FILE", str(csv_file))
+    monkeypatch.setattr(cli, "SEED_FILE", str(csv_file))
     junk, loved = add_books(("Colouring Book", "Nobody"), ("Old Favourite", "Somebody"))
     reader = add_reader("r@example.com")
     db.session.add(Favourite(user_id=reader.id, book_id=loved.id))
