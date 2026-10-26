@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% from "_library.html" import shelf_tile, library_styles %}
+
+{% block title %}{{ shelf_name }} · BookBuddy{% endblock %}
+
+{% block appbar %}
+  <a class="navicon" href="{{ url_for('library.your_library') }}" aria-label="Back to Your Library">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+  </a>
+  <div class="h1 clamp-1">{{ shelf_name }}</div>
+{% endblock %}
+
+{% block content %}
+{{ library_styles() }}
+
+<div class="lib">
+  {% if books %}
+    <p class="lib-note">{{ books|length }} book{{ '' if books|length == 1 else 's' }}</p>
+    <div class="lib-grid">
+      {% for b in books %}{{ shelf_tile(b, favourite_ids) }}{% endfor %}
+    </div>
+  {% else %}
+    <section class="lib-empty">
+      <p>No books on this shelf yet. Open a book and choose {{ shelf_name }}.</p>
+      <a class="button" href="{{ url_for('books.browse') }}">Browse books</a>
+    </section>
+  {% endif %}
+</div>
+{% endblock %}

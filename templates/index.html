@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 {% from "_cover.html" import book_cover %}
+{% from "_library.html" import reading_card, library_styles %}
+{% set fav_ids = favourite_ids() %}
 
 
 {% block appbar %}
@@ -29,6 +31,7 @@
 
 
 {% block content %}
+{{ library_styles() }}
 <style>
   .wrap{
     padding: 14px 16px 28px;
@@ -69,35 +72,11 @@
   }
   .f-search input::placeholder{ color: rgba(0,0,0,0.45); }
 
-  /* Top chips row (swipeable, no scrollbar) */
-  .chips{
-    display:flex;
-    gap:10px;
-    overflow-x:auto;
-    padding: 10px 2px 6px;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width:none;
-    -ms-overflow-style:none;
-  }
-  .chips::-webkit-scrollbar{ width:0; height:0; display:none; }
-
-  .chip{
-    flex:0 0 auto;
-    display:inline-flex;
-    align-items:center;
-    gap:8px;
-    height:36px;
-    padding:0 12px;
-    border-radius:12px;
-    background:#fff;
-    border:1px solid rgba(0,0,0,0.08);
-    box-shadow: 0 6px 18px rgba(0,0,0,0.06);
-    text-decoration:none;
-    color:#111;
-    font-size:14px;
-    white-space:nowrap;
-  }
-  .chip .cicon{ width:18px; height:18px; color:#111; opacity:.85; }
+  /* Currently reading strip (swipe sideways if there's more than one) */
+  .home-reading{ display:flex; gap:12px; overflow-x:auto; margin:0 -16px; padding:2px 16px 6px; scroll-snap-type:x mandatory; scrollbar-width:none; }
+  .home-reading::-webkit-scrollbar{ display:none; }
+  .home-reading .lib-reading{ flex:none; width:min(296px, 85%); box-sizing:border-box; scroll-snap-align:start; }
+  .home-reading .lib-reading:only-child{ width:100%; }
 
   /* Section headers */
   .h{
@@ -265,40 +244,16 @@
     <input name="q" placeholder="Search" autocomplete="off">
   </form>
 
-  <!-- Quick links chips row (under search, like Figma) -->
-  <div class="chips" aria-label="Quick links">
-    <a class="chip" href="{{ url_for('library.favourites') }}">
-      <svg class="cicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-        <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 1 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/>
-      </svg>
-      Favourites
-    </a>
-
-    <a class="chip" href="{{ url_for('library.history') }}">
-      <svg class="cicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-        <polyline points="1 4 1 10 7 10"></polyline>
-        <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
-        <polyline points="12 7 12 12 15 15"></polyline>
-      </svg>
-      History
-    </a>
-
-    <a class="chip" href="{{ url_for('social.following') }}">
-      <svg class="cicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-        <path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-        <circle cx="12" cy="7" r="4"></circle>
-      </svg>
-      Following
-    </a>
-
-    <a class="chip" href="{{ url_for('social.followers') }}">
-      <svg class="cicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-        <path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-        <circle cx="12" cy="7" r="4"></circle>
-      </svg>
-      Followers
-    </a>
+  {# Currently reading - only for logged-in readers with a book on that shelf #}
+  {% if reading %}
+  <div class="row-head" style="margin-top:18px;">
+    <div class="title">Currently reading</div>
+    <a class="seeall" href="{{ url_for('library.your_library') }}">Your Library</a>
   </div>
+  <div class="home-reading" aria-label="Currently reading">
+    {% for b in reading %}{{ reading_card(b, url_for('books.home')) }}{% endfor %}
+  </div>
+  {% endif %}
 
   <!-- Featured (hidden when the catalogue is empty, e.g. a fresh install before seeding) -->
   {% if featured %}
@@ -347,7 +302,7 @@
   <div class="grid">
     {% for b in top_rated %}
       <a class="tile" href="{{ url_for('books.book_details', book_id=b.id) }}">
-        {{ book_cover(b, "sm") }}
+        {{ book_cover(b, "sm", heart=b.id in fav_ids) }}
         <div class="meta">
           <div class="rating">{% if b.review_count %}{{ '%.1f'|format(b.rating) }} ★ · {{ b.review_count }} review{{ '' if b.review_count == 1 else 's' }}{% else %}No reviews yet{% endif %}</div>
           <div class="title">{{ b.title }}</div>

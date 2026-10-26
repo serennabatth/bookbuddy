@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "_cover.html" import book_cover %}
+{% set fav_ids = favourite_ids() %}
 
 {% block appbar %}
 <style>
@@ -194,7 +195,7 @@
     <div class="h-grid">
       {% for b in filtered %}
         <a class="h-tile" href="{{ url_for('books.book_details', book_id=b.id) }}">
-          {{ book_cover(b) }}
+          {{ book_cover(b, heart=b.id in fav_ids) }}
           <div class="h-meta">
             <div class="h-rating">{% if b.review_count %}{{ '%.1f'|format(b.rating) }} ★ · {{ b.review_count }} review{{ '' if b.review_count == 1 else 's' }}{% else %}No reviews yet{% endif %}</div>
             <div class="h-title">{{ b.title }}</div>

@@ -1,12 +1,30 @@
 """The reader's own lists - favourites and recently viewed."""
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, abort, g, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app.extensions import db
 from app.models import Book, Favourite, History, utc_now
 from app.services.catalogue import book_dict, ratings_for
+from app.services.security import safe_next_url
+from app.services.shelves import SHELVES, set_shelf, shelf_book_dicts, shelf_counts
+from app.services.stats import reading_stats
 
 bp = Blueprint("library", __name__)
+
+
+def current_favourite_ids() -> set[int]:
+    """Ids of the logged-in user's favourite books (looked up once per request)."""
+    if not current_user.is_authenticated:
+        return set()
+    if "favourite_ids" not in g:
+        g.favourite_ids = {f.book_id for f in Favourite.query.filter_by(user_id=current_user.id).all()}
+    return g.favourite_ids
+
+
+@bp.app_context_processor
+def inject_favourite_ids():
+    # lets any template call favourite_ids() to show hearts on covers
+    return {"favourite_ids": current_favourite_ids}
 
 
 def _matches(book: Book, q: str) -> bool:
@@ -21,6 +39,66 @@ def _book_from_json() -> Book | None:
         return db.session.get(Book, int(data.get("book_id") or 0))
     except (TypeError, ValueError):
         return None
+
+
+ROW_LIMIT = 12   # books shown in each row on the Your Library page
+
+
+@bp.route("/library")
+@login_required
+def your_library():
+    counts = shelf_counts(current_user.id)
+
+    fav_books = (
+        db.session.query(Book)
+        .join(Favourite, Favourite.book_id == Book.id)
+        .filter(Favourite.user_id == current_user.id)
+        .order_by(Favourite.created_at.desc())
+        .all()
+    )
+    recent_books = (
+        db.session.query(Book)
+        .join(History, History.book_id == Book.id)
+        .filter(History.user_id == current_user.id)
+        .order_by(History.viewed_at.desc())
+        .limit(10)
+        .all()
+    )
+    ratings = ratings_for([b.id for b in fav_books + recent_books])
+
+    def as_dicts(books):
+        return [book_dict(b, *ratings.get(b.id, (0.0, 0))) for b in books]
+
+    is_empty = not any(counts.values()) and not fav_books
+    return render_template(
+        "library.html",
+        counts=counts,
+        total=sum(counts.values()),
+        stats=reading_stats(current_user.id, utc_now().year),
+        reading=shelf_book_dicts(current_user.id, "reading"),
+        want=shelf_book_dicts(current_user.id, "want", ROW_LIMIT),
+        finished=shelf_book_dicts(current_user.id, "finished", ROW_LIMIT),
+        favourites=as_dicts(fav_books[:ROW_LIMIT]),
+        favourite_count=len(fav_books),
+        favourite_ids={b.id for b in fav_books},
+        recent=as_dicts(recent_books),
+        is_empty=is_empty,
+    )
+
+
+@bp.route("/library/<status>")
+@login_required
+def shelf_page(status):
+    """Every book on one shelf (the "See all" link)."""
+    if status not in SHELVES:
+        abort(404)
+    return render_template(
+        "library_shelf.html",
+        status=status,
+        shelf_name=SHELVES[status],
+        books=shelf_book_dicts(current_user.id, status),
+        favourite_ids=current_favourite_ids(),
+    )
 
 
 @bp.route("/favourites")
@@ -99,3 +177,19 @@ def api_history_add():
         db.session.add(History(user_id=current_user.id, book_id=book.id))
     db.session.commit()
     return jsonify({"ok": True})
+
+
+@bp.post("/books/<int:book_id>/shelf")
+@login_required
+def set_book_shelf(book_id):
+    """Put a book on a shelf, move it, or take it off (empty status).
+
+    A plain form post, so it works without JavaScript. "next" says where to
+    go afterwards (e.g. back to Home after "Finished it").
+    """
+    book = db.get_or_404(Book, book_id)
+    status = (request.form.get("status") or "").strip()
+    if status and status not in SHELVES:
+        abort(400)
+    set_shelf(current_user.id, book.id, status or None)
+    return redirect(safe_next_url(request.form.get("next")) or url_for("books.book_details", book_id=book.id))

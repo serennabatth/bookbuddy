@@ -294,6 +294,13 @@
       <button class="btn" id="clearBtn" type="button">Clear Review</button>
     </div>
 
+    <!-- DRAFT -->
+    <div class="draft-bar" aria-live="polite">
+      <span id="draftStatus"></span>
+      <button type="button" id="saveDraftBtn">Save draft</button>
+      <button type="button" id="discardDraftBtn" hidden>Discard draft</button>
+    </div>
+
   </div>
 
   <!-- hidden real post form -->
@@ -307,6 +314,7 @@
 
 </div>
 
+{% include "_drafts.html" %}
 
 <script>
   // Each search asks the server; this counter ignores answers to older searches
@@ -353,11 +361,58 @@
   }
 
   stars.forEach((s, i) => {
-    s.addEventListener('click', () => { rating = i + 1; paintStars(); });
+    s.addEventListener('click', () => { rating = i + 1; paintStars(); saveDraftSoon(); });
     s.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); rating = i + 1; paintStars(); }
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); rating = i + 1; paintStars(); saveDraftSoon(); }
     });
   });
+
+  // ---- Drafts (see _drafts.html) ----
+  // one draft per user for this page; it remembers the chosen book, text and stars
+  const DRAFT_KEY = 'bookbuddy:review-draft:{{ current_user.id }}:new';
+  const draftStatus = document.getElementById('draftStatus');
+  const discardDraftBtn = document.getElementById('discardDraftBtn');
+  let selectedBook = null;
+  let draftTimer = null;
+
+  function showDraftStatus(text, canDiscard){
+    draftStatus.textContent = text;
+    discardDraftBtn.hidden = !canDiscard;
+  }
+
+  function saveDraftNow(){
+    clearTimeout(draftTimer);
+    const text = reviewText.value || '';
+    if (!text.trim() && !rating && !selectedBook) {
+      ReviewDrafts.clear(DRAFT_KEY);
+      showDraftStatus('', false);
+      return;
+    }
+    const saved = ReviewDrafts.save(DRAFT_KEY, { book: selectedBook, text: text, rating: rating });
+    showDraftStatus(saved ? 'Draft saved' : "Couldn't save a draft in this browser", saved);
+  }
+
+  // save half a second after typing stops, rather than on every key press
+  function saveDraftSoon(){
+    clearTimeout(draftTimer);
+    draftTimer = setTimeout(saveDraftNow, 500);
+  }
+
+  function discardDraft(){
+    ReviewDrafts.clear(DRAFT_KEY);
+    reviewText.value = '';
+    rating = 0;
+    paintStars();
+    selectedBook = null;
+    selectedCard.style.display = 'none';
+    bookTitleField.value = '';
+    bookIdField.value = '';
+    showDraftStatus('', false);
+  }
+
+  reviewText.addEventListener('input', saveDraftSoon);
+  document.getElementById('saveDraftBtn').addEventListener('click', saveDraftNow);
+  discardDraftBtn.addEventListener('click', discardDraft);
 
 
   function openDropdown(){
@@ -390,7 +445,7 @@
     if (results.length){
       const b = results[0];
       topCover.src = (b.cover || '').trim() || PLACEHOLDER;
-      topCover.onerror = () => { topCover.src = PLACEHOLDER; };
+      topCover.onerror = () => { topCover.onerror = null; topCover.src = PLACEHOLDER; };  // only once, so a missing placeholder can't loop
       topTitle.textContent = b.title || '';
       topAuthor.textContent = b.author || '';
       topResult.style.display = 'flex';
@@ -450,13 +505,16 @@
     selTitle.textContent = b.title || '';
     selAuthor.textContent = b.author || '';
     selCover.src = (b.cover || '').trim() || PLACEHOLDER;
-    selCover.onerror = () => { selCover.src = PLACEHOLDER; };
+    selCover.onerror = () => { selCover.onerror = null; selCover.src = PLACEHOLDER; };  // only once, so a missing placeholder can't loop
 
     const r = (b.rating ?? b.avg_rating ?? '');
     selAvg.textContent = r ? `${Number(r).toFixed(2)} avg rating` : '';
 
     bookTitleField.value = b.title || '';
     bookIdField.value = b.id || '';
+    // only the fields needed to show the card again are kept in the draft
+    selectedBook = { id: b.id, title: b.title, author: b.author, cover: b.cover, rating: b.rating };
+    saveDraftSoon();
     closeDropdown();
     input.value = '';
     input.blur();
@@ -487,6 +545,7 @@
     reviewText.value = '';
     rating = 0;
     paintStars();
+    saveDraftNow();   // keeps the chosen book in the draft, or clears it if nothing's left
   });
 
   submitBtn.addEventListener('click', () => {
@@ -502,7 +561,19 @@
 
     reviewField.value = text;
     ratingField.value = rating;
+    ReviewDrafts.clear(DRAFT_KEY);
     document.getElementById('postForm').submit();
   });
+
+  // bring back a saved draft when the page opens
+  const draft = ReviewDrafts.load(DRAFT_KEY);
+  if (draft) {
+    if (draft.book && draft.book.id) selectBook(draft.book);
+    reviewText.value = draft.text || '';
+    rating = Number(draft.rating) || 0;
+    paintStars();
+    clearTimeout(draftTimer);   // restoring isn't a change, so don't re-save it
+    showDraftStatus('Draft from ' + ReviewDrafts.ago(draft.savedAt) + ' restored', true);
+  }
 </script>
 {% endblock %}

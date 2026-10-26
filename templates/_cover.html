@@ -9,17 +9,23 @@
           {{ book_cover(book) }}            regular size
           {{ book_cover(book, "sm") }}      small tiles (smaller title text)
           {{ book_cover(book, "art") }}     the large cover on a book's own page
+          {{ book_cover(book, heart=true) }}  adds a small heart for favourited books
 #}
-{% macro book_cover(b, variant="") -%}
+{% macro book_cover(b, variant="", heart=false) -%}
 {%- set palette = ["#2F4A3A", "#7A2E2A", "#23324A", "#5A3550", "#2E5A5A", "#4A4A48", "#6B4A2B", "#3E3A5C"] -%}
 {%- set has_art = b.cover and "placehold.co" not in b.cover -%}
-<div class="book-cover {{ variant }}" role="img" aria-label="Cover of {{ b.title }}{% if b.author %} by {{ b.author }}{% endif %}">
+<div class="book-cover {{ variant }}" role="img" aria-label="Cover of {{ b.title }}{% if b.author %} by {{ b.author }}{% endif %}{% if heart %} (in your favourites){% endif %}">
   <div class="book-cover-tile" style="background: {{ palette[(b.id or 0) % (palette|length)] }}" aria-hidden="true">
     <span class="book-cover-title">{{ b.title }}</span>
     <span class="book-cover-author">{{ b.author }}</span>
   </div>
   {%- if has_art %}
   <img class="book-cover-art" src="{{ b.cover }}" alt="" loading="lazy" onerror="this.remove()">
+  {%- endif %}
+  {%- if heart %}
+  <span class="book-cover-heart" aria-hidden="true">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2"><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"></path></svg>
+  </span>
   {%- endif %}
 </div>
 {%- endmacro %}
