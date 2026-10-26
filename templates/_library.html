@@ -2,6 +2,7 @@
   Shared pieces for the Your Library pages.
 
   {{ shelf_tile(book, favourite_ids) }}   one cover + title, with a heart if favourited
+  {{ reading_card(book, next_url) }}      a Currently reading card with a "Finished it" button
   {{ library_styles() }}                  the CSS both library pages use
 #}
 {% from "_cover.html" import book_cover %}
@@ -22,6 +23,26 @@
   </span>
   <span class="lib-title">{{ b.title }}</span>
 </a>
+{%- endmacro %}
+
+{% macro reading_card(b, next_url) -%}
+<article class="lib-reading">
+  <a class="cover" href="{{ url_for('books.book_details', book_id=b.id) }}" aria-hidden="true" tabindex="-1">{{ book_cover(b, "sm") }}</a>
+  <div class="info">
+    <a class="title" href="{{ url_for('books.book_details', book_id=b.id) }}">{{ b.title }}</a>
+    <span class="meta">{{ b.author }}</span>
+    {% if b.started_at %}<span class="meta">Started {{ b.started_at.day }} {{ b.started_at.strftime('%b') }}</span>{% endif %}
+    <form method="post" action="{{ url_for('library.set_book_shelf', book_id=b.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="status" value="finished">
+      <input type="hidden" name="next" value="{{ next_url }}">
+      <button class="finish-btn" type="submit">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"></path></svg>
+        Finished it
+      </button>
+    </form>
+  </div>
+</article>
 {%- endmacro %}
 
 {% macro library_styles() -%}

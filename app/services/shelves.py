@@ -3,6 +3,7 @@ from sqlalchemy import func
 
 from app.extensions import db
 from app.models import Book, ShelfEntry, utc_now
+from app.services.catalogue import book_dict, ratings_for
 
 SHELVES = {
     "want": "Want to read",
@@ -77,3 +78,13 @@ def books_on_shelf(user_id: int, status: str, limit: int | None = None) -> list[
     if limit:
         stmt = stmt.limit(limit)
     return [(book, entry) for book, entry in db.session.execute(stmt).all()]
+
+
+def shelf_book_dicts(user_id: int, status: str, limit: int | None = None) -> list[dict]:
+    """Books on a shelf in the format the templates use, plus started/finished dates."""
+    rows = books_on_shelf(user_id, status, limit)
+    ratings = ratings_for([b.id for b, _ in rows])
+    return [
+        {**book_dict(b, *ratings.get(b.id, (0.0, 0))), "started_at": entry.started_at, "finished_at": entry.finished_at}
+        for b, entry in rows
+    ]

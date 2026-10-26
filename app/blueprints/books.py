@@ -13,7 +13,7 @@ from app.services.catalogue import (
     average_rating, book_dict, books_with_ratings, paginate_books,
 )
 from app.services.security import safe_cover_url
-from app.services.shelves import PICKER_OPTIONS, shelf_for
+from app.services.shelves import PICKER_OPTIONS, shelf_book_dicts, shelf_for
 from app.services.users import display_name
 
 bp = Blueprint("books", __name__)
@@ -62,9 +62,11 @@ def home():
     top_rated = [book_dict(bk, float(avg), count) for bk, avg, count in rows]
     first_book = db.session.scalar(db.select(Book).order_by(Book.title).limit(1))
     featured = top_rated[0] if top_rated else (book_dict(first_book, 0.0) if first_book else {})
+    reading = shelf_book_dicts(current_user.id, "reading") if current_user.is_authenticated else []
     return render_template(
         "index.html",
         featured=featured,
+        reading=reading,
         genres=GENRES,
         top_rated=top_rated,
     )

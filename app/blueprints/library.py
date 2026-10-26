@@ -6,7 +6,7 @@ from app.extensions import db
 from app.models import Book, Favourite, History, utc_now
 from app.services.catalogue import book_dict, ratings_for
 from app.services.security import safe_next_url
-from app.services.shelves import SHELVES, books_on_shelf, set_shelf, shelf_counts
+from app.services.shelves import SHELVES, set_shelf, shelf_book_dicts, shelf_counts
 from app.services.stats import reading_stats
 
 bp = Blueprint("library", __name__)
@@ -27,15 +27,6 @@ def _book_from_json() -> Book | None:
 
 
 ROW_LIMIT = 12   # books shown in each row on the Your Library page
-
-
-def _shelf_books(user_id: int, status: str, limit: int | None = None) -> list[dict]:
-    rows = books_on_shelf(user_id, status, limit)
-    ratings = ratings_for([b.id for b, _ in rows])
-    return [
-        {**book_dict(b, *ratings.get(b.id, (0.0, 0))), "started_at": entry.started_at, "finished_at": entry.finished_at}
-        for b, entry in rows
-    ]
 
 
 @bp.route("/library")
@@ -69,9 +60,9 @@ def your_library():
         counts=counts,
         total=sum(counts.values()),
         stats=reading_stats(current_user.id, utc_now().year),
-        reading=_shelf_books(current_user.id, "reading"),
-        want=_shelf_books(current_user.id, "want", ROW_LIMIT),
-        finished=_shelf_books(current_user.id, "finished", ROW_LIMIT),
+        reading=shelf_book_dicts(current_user.id, "reading"),
+        want=shelf_book_dicts(current_user.id, "want", ROW_LIMIT),
+        finished=shelf_book_dicts(current_user.id, "finished", ROW_LIMIT),
         favourites=as_dicts(fav_books[:ROW_LIMIT]),
         favourite_count=len(fav_books),
         favourite_ids={b.id for b in fav_books},
@@ -91,7 +82,7 @@ def shelf_page(status):
         "library_shelf.html",
         status=status,
         shelf_name=SHELVES[status],
-        books=_shelf_books(current_user.id, status),
+        books=shelf_book_dicts(current_user.id, status),
         favourite_ids=fav_ids,
     )
 
