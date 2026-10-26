@@ -151,13 +151,13 @@
   <form method="POST" action="{{ url_for('login') }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="field">
-      <label class="label" for="username">Username</label>
-      <input id="username" name="username" class="input" type="text" placeholder="email@domain.com" required>
+      <label class="label" for="email">Email</label>
+      <input id="email" name="email" class="input" type="email" autocomplete="email" placeholder="you@example.com" required>
     </div>
 
     <div class="field">
       <label class="label" for="password">Password</label>
-      <input id="password" name="password" class="input" type="password" placeholder="password123" required>
+      <input id="password" name="password" class="input" type="password" autocomplete="current-password" required>
     </div>
 
     <button class="btn-dark" type="submit">Continue</button>

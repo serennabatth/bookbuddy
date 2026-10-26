@@ -35,3 +35,21 @@ def test_login_with_wrong_password_is_rejected(client):
 def test_logout_only_accepts_post(client):
     # A GET logout could be triggered by any image or link on another site.
     assert client.get("/logout").status_code == 405
+
+
+def test_login_form_fields_match_what_the_login_route_reads(client):
+    # The page's form must send "email" and "password", the names login() reads.
+    # A mismatch here once made every login fail with "Invalid email or password".
+    html = client.get("/login").get_data(as_text=True)
+    assert 'name="email"' in html
+    assert 'name="password"' in html
+
+
+def test_login_with_correct_password_succeeds(client):
+    client.post("/signup", data={"email": "b@example.com", "password": "right-password"})
+    client.post("/logout")
+
+    response = client.post("/login", data={"email": "b@example.com", "password": "right-password"})
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/")  # sent to the home page
