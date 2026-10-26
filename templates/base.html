@@ -224,10 +224,6 @@ input::placeholder,textarea::placeholder{color:var(--text-2)}
 .book-cover.sm .book-cover-author{ font-size:8px; }
 .book-cover-art{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block; }
 
-/* "Minimal" cover style: show the calm coloured tiles instead of cover art.
-   A book's own page ("art" variant) still shows its real cover. */
-.covers-minimal .book-cover:not(.art) .book-cover-art{ display:none; }
-
 /* Text clamping (global) */
 .clamp-1{
   overflow:hidden;
@@ -251,18 +247,6 @@ input::placeholder,textarea::placeholder{color:var(--text-2)}
   overflow:hidden;
 }
   </style>
-
-  <script>
-    // Cover style: real cover art (default) or calm coloured tiles ("minimal").
-    // Remembered in this browser only for now; it becomes a saved setting later.
-    (function () {
-      try {
-        if (localStorage.getItem('bb_covers') === 'minimal') {
-          document.documentElement.classList.add('covers-minimal');
-        }
-      } catch (e) {}
-    })();
-  </script>
 
   {% block head %}{% endblock %}
 </head>

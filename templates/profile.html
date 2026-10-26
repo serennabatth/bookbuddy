@@ -329,33 +329,46 @@
 
   <!-- Stats -->
   <div class="stats">
-  <a href="{{ url_for('my_reviews') }}" class="stat-card stat-link">
-    <div class="stat-num">{{ your_reviews|length }}</div>
+  {# On your own profile the stats link to your lists; on someone else's they're just numbers. #}
+  {% set tag = 'a' if is_own else 'div' %}
+  <{{ tag }} {% if is_own %}href="{{ url_for('my_reviews') }}"{% endif %} class="stat-card {% if is_own %}stat-link{% endif %}">
+    <div class="stat-num">{{ review_count|default(your_reviews|length) }}</div>
     <div class="stat-label">Reviews</div>
-  </a>
+  </{{ tag }}>
 
-  <a href="{{ url_for('followers') }}" class="stat-card stat-link">
+  <{{ tag }} {% if is_own %}href="{{ url_for('followers') }}"{% endif %} class="stat-card {% if is_own %}stat-link{% endif %}">
     <div class="stat-num">{{ followers_count|default(0) }}</div>
     <div class="stat-label">Followers</div>
-  </a>
+  </{{ tag }}>
 
-  <a href="{{ url_for('following') }}" class="stat-card stat-link">
+  <{{ tag }} {% if is_own %}href="{{ url_for('following') }}"{% endif %} class="stat-card {% if is_own %}stat-link{% endif %}">
     <div class="stat-num">{{ following_count|default(0) }}</div>
     <div class="stat-label">Following</div>
-  </a>
+  </{{ tag }}>
 </div>
 
   <!-- Actions -->
   <div class="actions">
-    <a href="{{ url_for('edit_profile') }}" class="action-btn">Edit Profile</a>
-    <a href="{{ url_for('share_profile') }}" class="action-btn">Share Profile</a>
+    {% if is_own %}
+      <a href="{{ url_for('edit_profile') }}" class="action-btn">Edit Profile</a>
+      <a href="{{ url_for('share_profile') }}" class="action-btn">Share Profile</a>
+    {% elif current_user.is_authenticated %}
+      <form method="post" action="{{ url_for('follow_toggle_form', user_id=profile_id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="action-btn" aria-pressed="{{ 'true' if is_following else 'false' }}">
+          {{ 'Following' if is_following else 'Follow' }}
+        </button>
+      </form>
+    {% else %}
+      <a href="{{ url_for('login') }}" class="action-btn">Log in to follow</a>
+    {% endif %}
   </div>
 
   <!-- Reviews -->
   <div class="reviews-wrap">
     <div class="reviews-head">
-      <div class="reviews-title">Your Reviews</div>
-      <a href="{{ url_for('my_reviews') }}" class="seeall">See all</a>
+      <div class="reviews-title">{{ "Your Reviews" if is_own else "Reviews" }}</div>
+      {% if is_own %}<a href="{{ url_for('my_reviews') }}" class="seeall">See all</a>{% endif %}
     </div>
 
     {% if your_reviews and your_reviews|length %}
@@ -380,7 +393,7 @@
     {% else %}
       <div class="empty-state">
         <div class="title">No reviews yet</div>
-        Reviews you write will appear here.
+        {{ "Reviews you write will appear here." if is_own else "No reviews yet." }}
       </div>
     {% endif %}
   </div>

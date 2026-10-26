@@ -230,29 +230,6 @@
     <noscript><button type="submit">Apply</button></noscript>
   </form>
 
-  <!-- Cover style switch: compare real covers with coloured tiles -->
-  <div role="group" aria-label="Cover style" style="display:flex; justify-content:flex-end; gap:6px; margin:-4px 0 8px; font-size:13px;">
-    <button type="button" class="button cover-style" data-covers="art" style="height:36px; padding:0 12px;">Covers</button>
-    <button type="button" class="button cover-style" data-covers="minimal" style="height:36px; padding:0 12px;">Tiles</button>
-  </div>
-  <script>
-    (function () {
-      const buttons = document.querySelectorAll('.cover-style');
-      function show(style) {
-        document.documentElement.classList.toggle('covers-minimal', style === 'minimal');
-        buttons.forEach(b => {
-          const on = b.dataset.covers === style;
-          b.setAttribute('aria-pressed', on ? 'true' : 'false');
-          b.classList.toggle('is-active', on);
-        });
-      }
-      buttons.forEach(b => b.addEventListener('click', () => {
-        try { localStorage.setItem('bb_covers', b.dataset.covers); } catch (e) {}
-        show(b.dataset.covers);
-      }));
-      show(document.documentElement.classList.contains('covers-minimal') ? 'minimal' : 'art');
-    })();
-  </script>
 
   {% if books %}
     <div class="f-grid">

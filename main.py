@@ -198,6 +198,24 @@ class Favourite(db.Model):
     __table_args__ = (db.UniqueConstraint("user_id", "book_id", name="uq_favourite_user_book"),)
 
 
+class Follow(db.Model):
+    """One reader following another. follower -> followed."""
+    id = db.Column(db.Integer, primary_key=True)
+    follower_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    followed_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    follower = db.relationship("User", foreign_keys=[follower_id])
+    followed = db.relationship("User", foreign_keys=[followed_id])
+
+    __table_args__ = (
+        # You can follow someone once...
+        db.UniqueConstraint("follower_id", "followed_id", name="uq_follow_pair"),
+        # ...and never yourself, even if a bug in the app tried to.
+        db.CheckConstraint("follower_id != followed_id", name="ck_follow_not_self"),
+    )
+
+
 class History(db.Model):
     id = db.Column(db.Integer, primary_key=True)
 
@@ -1072,75 +1090,112 @@ def top_rated():
 
 
 # ----------------------------
-# SOCIAL: Following / Followers (demo in-memory)
+# SOCIAL: Following / Followers
 # ----------------------------
-FOLLOWING = [
-    {"name": "John Smith",   "handle": "@johnsmith34"},
-    {"name": "Emma Davis",   "handle": "@emmadavis"},
-    {"name": "Sophia Nguyen","handle": "@sophiareads"},
-    {"name": "Oliver Brown", "handle": "@olibrown"},
-    {"name": "Lucas Garcia", "handle": "@l_garcia55"},
-    {"name": "Lily Gordon",  "handle": "@lilygordon01"},
-]
+def is_following(follower_id: int, followed_id: int) -> bool:
+    return Follow.query.filter_by(follower_id=follower_id, followed_id=followed_id).first() is not None
 
-FOLLOWERS = [
-    {"name": "Ava Patel",     "handle": "@avap_"},
-    {"name": "Ben Carter",    "handle": "@bencarter"},
-    {"name": "Chen Wei",      "handle": "@chenreads"},
-    {"name": "Diana Lopez",   "handle": "@dianalpz"},
-    {"name": "Ethan Murphy",  "handle": "@ethanm"},
-    {"name": "Fatima Khan",   "handle": "@fatimakhan"},
-]
+
+def follow_counts(user_id: int) -> tuple[int, int]:
+    """(followers, following) for one user."""
+    followers = Follow.query.filter_by(followed_id=user_id).count()
+    following = Follow.query.filter_by(follower_id=user_id).count()
+    return followers, following
+
+
+def toggle_follow(follower: User, target: User) -> bool:
+    """Follow target if not already following, otherwise unfollow. Returns True if now following."""
+    existing = Follow.query.filter_by(follower_id=follower.id, followed_id=target.id).first()
+    if existing:
+        db.session.delete(existing)
+        db.session.commit()
+        return False
+    db.session.add(Follow(follower_id=follower.id, followed_id=target.id))
+    db.session.commit()
+    return True
+
+
+def _people(users, q: str) -> list[dict]:
+    """The shape the Followers and Following pages expect, filtered by an optional search."""
+    q = (q or "").strip().lower()
+    people = []
+    for u in users:
+        name, handle = (u.name or ""), (u.handle or "")
+        if q and q not in name.lower() and q not in handle.lower():
+            continue
+        people.append({"id": u.id, "name": name or "Reader", "handle": handle, "avatar": u.avatar or ""})
+    return people
 
 
 @app.route("/following")
+@login_required
 def following():
-    q = (request.args.get("q") or "").strip().lower()
-    people = FOLLOWING[:]
-    if q:
-        people = [p for p in people if q in p["name"].lower() or q in p["handle"].lower()]
-    return render_template("following.html", people=people)
+    users = (
+        db.session.execute(
+            db.select(User).join(Follow, Follow.followed_id == User.id)
+            .where(Follow.follower_id == current_user.id)
+            .order_by(Follow.created_at.desc())
+        ).scalars().all()
+    )
+    return render_template("following.html", people=_people(users, request.args.get("q")))
 
 
 @app.route("/followers")
+@login_required
 def followers():
-    q = (request.args.get("q") or "").strip().lower()
-    people = FOLLOWERS[:]
-    if q:
-        people = [p for p in people if q in p["name"].lower() or q in p["handle"].lower()]
-    return render_template("followers.html", people=people)
+    users = (
+        db.session.execute(
+            db.select(User).join(Follow, Follow.follower_id == User.id)
+            .where(Follow.followed_id == current_user.id)
+            .order_by(Follow.created_at.desc())
+        ).scalars().all()
+    )
+    return render_template("followers.html", people=_people(users, request.args.get("q")))
 
 
-@app.route("/api/following/toggle", methods=["POST"])
+def _target_user_from_json():
+    """The user named by {"user_id": ...} in a JSON request, or None."""
+    data = request.get_json(silent=True) or {}
+    try:
+        return db.session.get(User, int(data.get("user_id") or 0))
+    except (TypeError, ValueError):
+        return None
+
+
+@app.post("/api/following/toggle")
+@login_required
 def api_following_toggle():
-    data = request.get_json(silent=True) or {}
-    handle = (data.get("handle") or "").strip()
-    if not handle:
-        return {"ok": False, "error": "missing handle"}, 400
-
-    idx = next((i for i, p in enumerate(FOLLOWING) if p["handle"] == handle), None)
-    if idx is not None:
-        FOLLOWING.pop(idx)
-        return {"ok": True, "state": "unfollowed"}
-    else:
-        name_guess = handle.lstrip("@").replace("_", " ").title() or "User"
-        FOLLOWING.append({"name": name_guess, "handle": handle})
-        return {"ok": True, "state": "followed"}
+    target = _target_user_from_json()
+    if target is None:
+        return jsonify({"ok": False, "error": "That reader doesn't exist."}), 404
+    if target.id == current_user.id:
+        return jsonify({"ok": False, "error": "You can't follow yourself."}), 400
+    now_following = toggle_follow(current_user, target)
+    return jsonify({"ok": True, "state": "followed" if now_following else "unfollowed"})
 
 
-@app.route("/api/followers/remove", methods=["POST"])
+@app.post("/api/followers/remove")
+@login_required
 def api_followers_remove():
-    data = request.get_json(silent=True) or {}
-    handle = (data.get("handle") or "").strip()
-    if not handle:
-        return {"ok": False, "error": "missing handle"}, 400
+    target = _target_user_from_json()
+    row = target and Follow.query.filter_by(follower_id=target.id, followed_id=current_user.id).first()
+    if not row:
+        return jsonify({"ok": False, "error": "That reader doesn't follow you."}), 404
+    db.session.delete(row)
+    db.session.commit()
+    return jsonify({"ok": True})
 
-    idx = next((i for i, p in enumerate(FOLLOWERS) if p["handle"] == handle), None)
-    if idx is None:
-        return {"ok": False, "error": "not found"}, 404
 
-    FOLLOWERS.pop(idx)
-    return {"ok": True}
+@app.post("/users/<int:user_id>/follow")
+@login_required
+def follow_toggle_form(user_id):
+    """The Follow / Unfollow button on a public profile (works without JavaScript)."""
+    target = db.get_or_404(User, user_id)
+    if target.id != current_user.id:
+        toggle_follow(current_user, target)
+    if target.handle:
+        return redirect(url_for("public_profile", handle=target.handle.lstrip("@")))
+    return redirect(url_for("profile_page"))
 
 
 # ---------- Genre landing  ----------
@@ -1227,7 +1282,12 @@ def profile_page():
         .all()
     )
 
-    return render_template("profile.html", user=user, your_reviews=recent)
+    followers_count, following_count = follow_counts(current_user.id)
+    return render_template(
+        "profile.html", user=user, your_reviews=recent, is_own=True,
+        review_count=Review.query.filter_by(user_id=current_user.id).count(),
+        followers_count=followers_count, following_count=following_count,
+    )
 
 
 @app.route("/my-reviews")
@@ -1348,7 +1408,15 @@ def public_profile(handle):
         Review.query.filter_by(user_id=owner.id)
         .order_by(Review.created.desc()).limit(6).all()
     )
-    return render_template("profile.html", user=user, your_reviews=reviews)
+    followers_count, following_count = follow_counts(owner.id)
+    is_own = current_user.is_authenticated and current_user.id == owner.id
+    return render_template(
+        "profile.html", user=user, your_reviews=reviews,
+        profile_id=owner.id, is_own=is_own,
+        is_following=current_user.is_authenticated and not is_own and is_following(current_user.id, owner.id),
+        review_count=Review.query.filter_by(user_id=owner.id).count(),
+        followers_count=followers_count, following_count=following_count,
+    )
 
 
 @app.route("/settings")

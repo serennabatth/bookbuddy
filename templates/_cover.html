@@ -3,13 +3,12 @@
 
   It always draws a "tile" (a solid colour with the title and author) and,
   when the book has cover art, puts the real image on top of it. So if the
-  image fails to load (or the reader prefers tiles; see .covers-minimal in
-  base.html), the tile underneath simply shows instead.
+  image is missing or fails to load, the tile underneath simply shows instead.
 
   Usage:  {% from "_cover.html" import book_cover %}
           {{ book_cover(book) }}            regular size
           {{ book_cover(book, "sm") }}      small tiles (smaller title text)
-          {{ book_cover(book, "art") }}     always show real art when there is some
+          {{ book_cover(book, "art") }}     the large cover on a book's own page
 #}
 {% macro book_cover(b, variant="") -%}
 {%- set palette = ["#2F4A3A", "#7A2E2A", "#23324A", "#5A3550", "#2E5A5A", "#4A4A48", "#6B4A2B", "#3E3A5C"] -%}
