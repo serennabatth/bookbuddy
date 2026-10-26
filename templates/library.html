@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% from "_cover.html" import book_cover %}
+{% from "_library.html" import shelf_tile, library_styles %}
+
+{% block title %}Your Library · BookBuddy{% endblock %}
+
+{% block content %}
+{{ library_styles() }}
+
+<div class="lib">
+  <header>
+    <h1>Your Library</h1>
+    <div class="sub">
+      {% if is_empty %}Nothing on your shelves yet{% else %}{{ total }} book{{ '' if total == 1 else 's' }} across your shelves{% endif %}
+    </div>
+  </header>
+
+  {% if is_empty %}
+    <section class="lib-empty" aria-labelledby="start-h">
+      <h2 id="start-h">Start your library</h2>
+      <p>Open any book and choose Want to read, Reading or Finished. Your reading stats appear here once you finish your first book.</p>
+      <a class="button" href="{{ url_for('books.browse') }}">Browse books</a>
+    </section>
+  {% else %}
+
+    {% if stats.finished or stats.reviews %}
+    <section class="lib-section" aria-labelledby="stats-h">
+      <h2 id="stats-h" class="lib-stats-label">Your reading in {{ stats.year }}</h2>
+      <div class="lib-stats">
+        <div class="lib-stat"><div class="num">{{ stats.finished }}</div><div class="label">Book{{ '' if stats.finished == 1 else 's' }} finished</div></div>
+        <div class="lib-stat"><div class="num">{{ stats.reviews }}</div><div class="label">Review{{ '' if stats.reviews == 1 else 's' }} written</div></div>
+        <div class="lib-stat"><div class="num">{{ stats.avg_rating if stats.avg_rating is not none else '–' }}</div><div class="label">Average rating you give</div></div>
+        <div class="lib-stat"><div class="num">{{ stats.top_genre or '–' }}</div><div class="label">Your most-read genre</div></div>
+      </div>
+    </section>
+    {% endif %}
+
+    {% if reading %}
+    <section class="lib-section" aria-labelledby="reading-h">
+      <div class="lib-head"><h2 id="reading-h">Currently reading</h2><span class="count">{{ counts.reading }}</span></div>
+      {% for b in reading %}
+        <article class="lib-reading">
+          <a class="cover" href="{{ url_for('books.book_details', book_id=b.id) }}" aria-hidden="true" tabindex="-1">{{ book_cover(b, "sm") }}</a>
+          <div class="info">
+            <a class="title" href="{{ url_for('books.book_details', book_id=b.id) }}">{{ b.title }}</a>
+            <span class="meta">{{ b.author }}</span>
+            {% if b.started_at %}<span class="meta">Started {{ b.started_at.day }} {{ b.started_at.strftime('%b') }}</span>{% endif %}
+            <form method="post" action="{{ url_for('library.set_book_shelf', book_id=b.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="status" value="finished">
+              <input type="hidden" name="next" value="{{ url_for('library.your_library') }}">
+              <button class="finish-btn" type="submit">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"></path></svg>
+                Finished it
+              </button>
+            </form>
+          </div>
+        </article>
+      {% endfor %}
+    </section>
+    {% endif %}
+
+    {% for key, name, books, count, see_all in [
+         ('want', 'Want to read', want, counts.want, url_for('library.shelf_page', status='want')),
+         ('finished', 'Finished', finished, counts.finished, url_for('library.shelf_page', status='finished')),
+         ('fav', 'Favourites', favourites, favourite_count, url_for('library.favourites')),
+       ] %}
+      <section class="lib-section" aria-labelledby="{{ key }}-h">
+        <div class="lib-head">
+          <h2 id="{{ key }}-h">{{ name }}</h2><span class="count">{{ count }}</span>
+          {% if count %}<a class="see" href="{{ see_all }}">See all</a>{% endif %}
+        </div>
+        {% if books %}
+          <div class="lib-row">
+            {% for b in books %}{{ shelf_tile(b, favourite_ids) }}{% endfor %}
+          </div>
+        {% elif key == 'fav' %}
+          <p class="lib-note">Tap the heart on any book to add it here.</p>
+        {% else %}
+          <p class="lib-note">Nothing here yet.</p>
+        {% endif %}
+      </section>
+    {% endfor %}
+
+    {% if recent %}
+    <section class="lib-section" aria-labelledby="recent-h">
+      <div class="lib-head"><h2 id="recent-h">Recently viewed</h2><a class="see" href="{{ url_for('library.history') }}">See all</a></div>
+      <div class="lib-row">
+        {% for b in recent %}{{ shelf_tile(b, favourite_ids, "small") }}{% endfor %}
+      </div>
+    </section>
+    {% endif %}
+  {% endif %}
+</div>
+{% endblock %}
