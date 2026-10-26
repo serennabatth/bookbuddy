@@ -1,0 +1,55 @@
+{#
+  Review drafts, saved in this browser's localStorage.
+
+  A draft survives a refresh, closing the tab or the browser crashing, but it
+  stays on this device (it isn't sent to the server). Drafts are deleted after
+  30 days, when the review is submitted, and when you log out (see base.html).
+#}
+<script>
+  window.ReviewDrafts = (function () {
+    const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+
+    // localStorage can be full or switched off (e.g. some private windows),
+    // so every call is wrapped in try/catch and drafts just quietly don't save.
+    function load(key) {
+      try {
+        const draft = JSON.parse(localStorage.getItem(key));
+        if (!draft || Date.now() - draft.savedAt > MAX_AGE_MS) {
+          localStorage.removeItem(key);
+          return null;
+        }
+        return draft;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function save(key, data) {
+      try {
+        localStorage.setItem(key, JSON.stringify(Object.assign({}, data, { savedAt: Date.now() })));
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function clear(key) {
+      try { localStorage.removeItem(key); } catch (e) {}
+    }
+
+    function ago(timestamp) {
+      const minutes = Math.round((Date.now() - timestamp) / 60000);
+      if (minutes < 1) return "just now";
+      if (minutes < 60) return minutes + " min ago";
+      const hours = Math.round(minutes / 60);
+      if (hours < 24) return hours + "h ago";
+      return Math.round(hours / 24) + "d ago";
+    }
+
+    return { load: load, save: save, clear: clear, ago: ago };
+  })();
+</script>
+<style>
+  .draft-bar { display:flex; align-items:center; gap:10px; min-height:20px; font-size:13px; color:var(--text-2); }
+  .draft-bar button { border:0; background:none; padding:4px 0; font:600 13px system-ui, sans-serif; color:var(--text); text-decoration:underline; cursor:pointer; }
+</style>

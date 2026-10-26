@@ -57,9 +57,68 @@
     <textarea id="review-text" name="review" maxlength="2000" required>{{ review.text }}</textarea>
   </div>
 
+  <div class="draft-bar" aria-live="polite">
+    <span id="draftStatus"></span>
+    <button type="button" id="discardDraftBtn" hidden>Discard changes</button>
+  </div>
+
   <div class="er-actions">
     <button type="submit" class="button primary">Save changes</button>
     <a class="button" href="{{ url_for('books.book_details', book_id=book.id) }}">Cancel</a>
   </div>
 </form>
+
+{% include "_drafts.html" %}
+<script>
+  // unsaved edits to this review are kept as a draft until you press Save changes
+  (function () {
+    const KEY = 'bookbuddy:review-draft:{{ current_user.id }}:review-{{ review.id }}';
+    const form = document.querySelector('.er-wrap');
+    const textarea = document.getElementById('review-text');
+    const status = document.getElementById('draftStatus');
+    const discardBtn = document.getElementById('discardDraftBtn');
+    const original = { text: textarea.value, rating: String({{ review.rating }}) };
+    let timer = null;
+
+    function checkedRating() {
+      const checked = form.querySelector('input[name="rating"]:checked');
+      return checked ? checked.value : '';
+    }
+    function setRating(value) {
+      const radio = form.querySelector('input[name="rating"][value="' + value + '"]');
+      if (radio) radio.checked = true;
+    }
+    function show(text, canDiscard) {
+      status.textContent = text;
+      discardBtn.hidden = !canDiscard;
+    }
+    function save() {
+      const current = { text: textarea.value, rating: checkedRating() };
+      if (current.text === original.text && current.rating === original.rating) {
+        ReviewDrafts.clear(KEY);   // back to how it was, so nothing to keep
+        show('', false);
+      } else if (ReviewDrafts.save(KEY, current)) {
+        show('Unsaved changes kept as a draft', true);
+      }
+    }
+    function saveSoon() { clearTimeout(timer); timer = setTimeout(save, 500); }
+
+    textarea.addEventListener('input', saveSoon);
+    form.addEventListener('change', saveSoon);
+    form.addEventListener('submit', () => ReviewDrafts.clear(KEY));
+    discardBtn.addEventListener('click', () => {
+      ReviewDrafts.clear(KEY);
+      textarea.value = original.text;
+      setRating(original.rating);
+      show('', false);
+    });
+
+    const draft = ReviewDrafts.load(KEY);
+    if (draft) {
+      textarea.value = draft.text || '';
+      setRating(draft.rating);
+      show('Draft from ' + ReviewDrafts.ago(draft.savedAt) + ' restored', true);
+    }
+  })();
+</script>
 {% endblock %}

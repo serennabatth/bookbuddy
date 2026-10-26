@@ -371,6 +371,19 @@ input::placeholder,textarea::placeholder{color:var(--text-2)}
 
   {% block scripts %}{% endblock %}
   <script>
+    // Logging out deletes any review drafts saved in this browser (see _drafts.html),
+    // so the next person using this computer can't read them.
+    document.addEventListener('submit', function (e) {
+      const action = e.target.getAttribute('action') || '';
+      if (!action.endsWith('/logout')) return;
+      try {
+        Object.keys(localStorage)
+          .filter(function (key) { return key.indexOf('bookbuddy:review-draft:') === 0; })
+          .forEach(function (key) { localStorage.removeItem(key); });
+      } catch (err) {}
+    });
+  </script>
+  <script>
     function socialUnavailable(provider) {
       alert(provider + " sign-in is coming soon.\n\nFor now, please use email and password.");
     }
