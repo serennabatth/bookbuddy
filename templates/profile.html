@@ -361,7 +361,7 @@
     {% if your_reviews and your_reviews|length %}
       <div class="grid">
         {% for r in your_reviews %}
-          <a href="{{ url_for('book_details', title=r.book_title) }}" class="review-card">
+          <a href="{{ url_for('book_details', book_id=r.book_id) }}" class="review-card">
             <div class="thumb">
               <img
                 src="{{ r.book_cover }}"

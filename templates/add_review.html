@@ -300,6 +300,7 @@
   <form id="postForm" action="{{ url_for('add_review') }}" method="post" style="display:none;">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="book_title" id="bookTitle">
+    <input type="hidden" name="book_id" id="bookId">
     <input type="hidden" name="review" id="reviewField">
     <input type="hidden" name="rating" id="ratingField" value="0">
   </form>
@@ -337,6 +338,7 @@
   const clearBtn = document.getElementById('clearBtn');
 
   const bookTitleField = document.getElementById('bookTitle');
+  const bookIdField = document.getElementById('bookId');
   const reviewField = document.getElementById('reviewField');
   const ratingField = document.getElementById('ratingField');
 
@@ -449,6 +451,7 @@
     selAvg.textContent = r ? `${Number(r).toFixed(2)} avg rating` : '';
 
     bookTitleField.value = b.title || '';
+    bookIdField.value = b.id || '';
     closeDropdown();
     input.value = '';
     input.blur();

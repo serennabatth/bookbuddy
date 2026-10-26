@@ -176,7 +176,7 @@
   {% if filtered and filtered|length %}
     <div class="f-grid">
       {% for b in filtered %}
-        <a class="f-tile" href="{{ url_for('book_details', title=b.title) }}">
+        <a class="f-tile" href="{{ url_for('book_details', book_id=b.id) }}">
           <img
             class="f-cover"
             src="{{ b.cover }}"

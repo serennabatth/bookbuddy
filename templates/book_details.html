@@ -89,7 +89,7 @@
 
   <div class="section">
     <div class="title">User reviews</div>
-    <a class="see" href="{{ url_for('book_reviews', title=book.title) }}">See all</a>
+    <a class="see" href="{{ url_for('book_reviews', book_id=book.id) }}">See all</a>
   </div>
 
   {% if reviews %}

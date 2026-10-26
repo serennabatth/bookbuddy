@@ -192,7 +192,7 @@
   {% if filtered and filtered|length %}
     <div class="h-grid">
       {% for b in filtered %}
-        <a class="h-tile" href="{{ url_for('book_details', title=b.title) }}">
+        <a class="h-tile" href="{{ url_for('book_details', book_id=b.id) }}">
           <img
             class="h-cover"
             src="{{ b.cover }}"

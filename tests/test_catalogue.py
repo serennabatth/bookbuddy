@@ -14,22 +14,23 @@ def no_internet(monkeypatch):
 
 
 def test_catalogue_makes_no_network_calls(app, no_internet):
+    db.session.add(Book(title="Dracula", author="Bram Stoker"))
+    db.session.commit()
     books = all_books_ui()
-    assert len(books) == len(main.BOOKS)  # the demo books, with an empty database
+    assert [b["title"] for b in books] == ["Dracula"]
 
 
 def test_catalogue_averages_ratings_per_book(app):
     reader = User(email="r@example.com")
     reader.set_password("long-password")
-    db.session.add_all([
-        reader,
-        Book(title="Dracula", author="Bram Stoker"),
-        Book(title="Emma", author="Jane Austen"),
-    ])
+    other = User(email="o@example.com")
+    other.set_password("long-password")
+    dracula = Book(title="Dracula", author="Bram Stoker")
+    db.session.add_all([reader, other, dracula, Book(title="Emma", author="Jane Austen")])
     db.session.commit()
     db.session.add_all([
-        Review(user_id=reader.id, book_title="Dracula", rating=4, text="Good"),
-        Review(user_id=reader.id, book_title="Dracula", rating=2, text="Okay"),
+        Review(user_id=reader.id, book_id=dracula.id, book_title="Dracula", rating=4, text="Good"),
+        Review(user_id=other.id, book_id=dracula.id, book_title="Dracula", rating=2, text="Okay"),
     ])
     db.session.commit()
 

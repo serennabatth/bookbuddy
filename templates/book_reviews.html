@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block appbar %}
-  <a class="navicon" href="{{ url_for('book_details', title=book.title) }}" aria-label="Back">
+  <a class="navicon" href="{{ url_for('book_details', book_id=book.id) }}" aria-label="Back">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <polyline points="15 18 9 12 15 6"></polyline>
     </svg>

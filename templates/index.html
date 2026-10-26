@@ -299,15 +299,17 @@
     </a>
   </div>
 
-  <!-- Featured -->
+  <!-- Featured (hidden when the catalogue is empty, e.g. a fresh install before seeding) -->
+  {% if featured %}
   <div class="h">Featured Book</div>
-  <a class="featured" href="{{ url_for('book_details', title=featured.title) }}">
+  <a class="featured" href="{{ url_for('book_details', book_id=featured.id) }}">
     <img
       src="{{ featured.cover }}"
       alt="{{ featured.title }}"
       onerror="this.onerror=null;this.src='https://placehold.co/800x400/EEE/AAA?text=No+Cover';"
     >
   </a>
+  {% endif %}
 
   <!-- Search by genre -->
   <div class="row-head" style="margin-top:18px;">
@@ -343,7 +345,7 @@
 
   <div class="grid">
     {% for b in top_rated %}
-      <a class="tile" href="{{ url_for('book_details', title=b.title) }}">
+      <a class="tile" href="{{ url_for('book_details', book_id=b.id) }}">
         <img
           class="cover"
           src="{{ b.cover }}"

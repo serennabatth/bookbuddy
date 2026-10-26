@@ -1,6 +1,6 @@
 from flask import (
     Flask, render_template, request, redirect, url_for,
-    flash, send_file, jsonify, session
+    flash, send_file, jsonify, session, abort
 )
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import (
@@ -16,9 +16,11 @@ import qrcode
 import qrcode.image.pil  # ensure PIL backend available
 import os
 import secrets
+import sqlite3
 from datetime import datetime
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
-from sqlalchemy import text, func
+from sqlalchemy import event, func
+from sqlalchemy.engine import Engine
 from urllib.parse import quote, urlparse
 from urllib.request import urlopen, Request
 import json
@@ -72,6 +74,20 @@ db = SQLAlchemy(app)
 # most things in place: it copies the table, changes it and swaps it back.
 migrate = Migrate(app, db, render_as_batch=True)
 
+
+@event.listens_for(Engine, "connect")
+def _enable_sqlite_foreign_keys(dbapi_connection, connection_record) -> None:
+    """SQLite ignores foreign keys unless told otherwise on every connection.
+
+    With this on, the database itself refuses a review for a book or user
+    that doesn't exist. PostgreSQL always enforces them, so this only
+    matters locally.
+    """
+    if isinstance(dbapi_connection, sqlite3.Connection):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
 # CSRF protection: every POST must carry a secret token that only pages from
 # this site know, so another website can't submit forms as a logged-in user.
 # Forms send it as a hidden "csrf_token" field; fetch() calls send it in an
@@ -117,13 +133,30 @@ class Review(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
     user = db.relationship("User", backref=db.backref("reviews", lazy=True))
 
+    # Which book this review is about. Before Phase 3 task 4, reviews were
+    # matched to books by title text, so books with the same title shared reviews.
+    book_id = db.Column(
+        db.Integer, db.ForeignKey("book.id", name="fk_review_book_id_book"),
+        nullable=False, index=True,
+    )
+    book = db.relationship("Book", backref=db.backref("reviews", lazy=True))
+
+    # Copies of the book's details at the time of the review.
+    # Task 5 removes these and reads them from review.book instead.
     book_title = db.Column(db.String(255), nullable=False)
     book_author = db.Column(db.String(255), default="")
     book_cover = db.Column(db.String(500), default="")
 
-    rating = db.Column(db.Integer, default=0)
+    rating = db.Column(db.Integer, nullable=False)
     text = db.Column(db.Text, default="")
     created = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        # One review per reader per book.
+        db.UniqueConstraint("user_id", "book_id", name="uq_review_user_book"),
+        # The database rejects any rating outside 1 to 5, even if a bug lets one through.
+        db.CheckConstraint("rating >= 1 AND rating <= 5", name="ck_review_rating_range"),
+    )
 
 
 class Book(db.Model):
@@ -176,26 +209,8 @@ def load_user(user_id):
 # -----------------------------------------------------------------------------
 # Demo Data 
 # -----------------------------------------------------------------------------
-BOOKS = [
-    {"title": "The Great Gatsby", "author": "F. Scott Fitzgerald", "genre": "Classics", "rating": 4.40,
-     "cover": "https://covers.openlibrary.org/b/id/7222246-L.jpg"},
-    {"title": "Jane Eyre", "author": "Charlotte Brontë", "genre": "Romance", "rating": 4.30,
-     "cover": "https://covers.openlibrary.org/b/id/8226098-L.jpg"},
-    {"title": "1984", "author": "George Orwell", "genre": "Dystopian", "rating": 4.60,
-     "cover": "https://covers.openlibrary.org/b/id/7222246-L.jpg"},
-    {"title": "Frankenstein", "author": "Mary Shelley", "genre": "Horror", "rating": 4.20,
-     "cover": "https://covers.openlibrary.org/b/id/8378631-L.jpg"},
-    {"title": "Crime and Punishment", "author": "Fyodor Dostoevsky", "genre": "Classics", "rating": 4.70,
-     "cover": "https://covers.openlibrary.org/b/id/8100933-L.jpg"},
-    {"title": "The Bell Jar", "author": "Sylvia Plath", "genre": "Literary", "rating": 4.10,
-     "cover": "https://covers.openlibrary.org/b/id/8231856-L.jpg"},
-    {"title": "The Picture of Dorian Gray", "author": "Oscar Wilde", "genre": "Gothic", "rating": 4.30,
-     "cover": "https://covers.openlibrary.org/b/id/8229216-L.jpg"},
-    {"title": "Moby-Dick", "author": "Herman Melville", "genre": "Adventure", "rating": 3.90,
-     "cover": "https://covers.openlibrary.org/b/id/7222276-L.jpg"},
-    {"title": "The Handmaid's Tale", "author": "Margaret Atwood", "genre": "Dystopian", "rating": 4.50,
-     "cover": "https://covers.openlibrary.org/b/id/8235116-L.jpg"},
-]
+# The 9 hard-coded demo books that used to live here were moved into the
+# database by the migration in Phase 3 task 4.
 
 GENRES = [
     "Romance", "Fantasy", "Horror", "Mystery", "Non-fiction",
@@ -365,59 +380,37 @@ def _ol_best_match(title: str, author: str = "", timeout: int = 15) -> dict:
     return {"cover": cover, "cover_i": cover_i, "isbn": isbn, "olid": olid, "year": year}
 
 
-def all_books_ui():
+def all_books_ui() -> list[dict]:
+    """Every book as a dict for templates and JavaScript, with its average rating.
+
+    All average ratings come from ONE grouped query, not one per book.
+    Task 5 replaces this with paginated SQL queries.
     """
-    Returns list of dicts for templates/JS: demo BOOKS + DB Book rows.
-    Also adds computed avg rating from Review rows (by title match).
-
-    Performance (stopgap until Phase 3 task 5):
-      - no Open Library calls here: demo books use their stored cover link
-      - all average ratings come from ONE grouped query, not one per book
-    """
-    demo = []
-    for b in BOOKS:
-        title = b.get("title", "")
-        author = b.get("author", "")
-        best_cover = safe_cover_url(b.get("cover"))
-
-        demo.append({
-            "title": title,
-            "author": author,
-            "genre": b.get("genre", "Other"),
-            "year": b.get("year", ""),
-            "cover": best_cover or PLACEHOLDER_COVER,
-            "rating": float(b.get("rating", 0.0) or 0.0),
-        })
-
-    # {book title: average rating} for every reviewed book, in one query.
-    avg_by_title = dict(
-        db.session.query(Review.book_title, func.avg(Review.rating))
-        .group_by(Review.book_title)
+    # {book id: average rating} for every reviewed book.
+    avg_by_book = dict(
+        db.session.query(Review.book_id, func.avg(Review.rating))
+        .group_by(Review.book_id)
         .all()
     )
 
-    db_books = Book.query.all()
-    db_list = []
-    for bk in db_books:
-        avg = avg_by_title.get(bk.title)
-
+    books = []
+    for bk in Book.query.all():
         built = _ol_cover_url(
-            cover_i=str(getattr(bk, "cover_i", "") or ""),
-            isbn=str(getattr(bk, "isbn", "") or ""),
-            olid=str(getattr(bk, "olid", "") or ""),
+            cover_i=str(bk.cover_i or ""),
+            isbn=str(bk.isbn or ""),
+            olid=str(bk.olid or ""),
         )
-        final_cover = built or safe_cover_url(bk.cover) or PLACEHOLDER_COVER
-
-        db_list.append({
+        books.append({
+            "id": bk.id,
             "title": bk.title,
             "author": bk.author,
             "genre": bk.genre or "Other",
             "year": bk.year or "",
-            "cover": final_cover,
-            "rating": float(avg or 0.0),
+            "cover": built or safe_cover_url(bk.cover) or PLACEHOLDER_COVER,
+            "rating": float(avg_by_book.get(bk.id) or 0.0),
         })
+    return books
 
-    return demo + db_list
 
 def _time_ago(dt: datetime) -> str:
     """Return a friendly 'time ago' string like 2d ago, 3h ago."""
@@ -536,29 +529,6 @@ def _ol_description_for(title: str, author: str = "", timeout: int = 4) -> str:
         return desc
 
     return ""
-
-def get_or_create_book_row(book_dict: dict) -> Book:
-    """Ensure a Book row exists for this UI book dict, return the row."""
-    title = (book_dict.get("title") or "").strip()
-    author = (book_dict.get("author") or "").strip()
-    if not title or not author:
-        return None
-
-    existing = Book.query.filter_by(title=title, author=author).first()
-    if existing:
-        return existing
-
-    b = Book(
-        title=title,
-        author=author,
-        genre=book_dict.get("genre") or "Other",
-        year=book_dict.get("year") or "",
-        cover=book_dict.get("cover") or PLACEHOLDER_COVER,
-    )
-    db.session.add(b)
-    db.session.commit()
-    return b
-
 
 # -----------------------------------------------------------------------------
 # Bulk seeding helper (Open Library) + curated search terms
@@ -714,7 +684,7 @@ def seed_command() -> None:
 def home():
     # Use combined list so homepage benefits from seeded DB too
     books = all_books_ui()
-    featured = books[0] if books else (BOOKS[0] if BOOKS else {})
+    featured = books[0] if books else {}
     top_rated = sorted(books, key=lambda b: b.get("rating", 0.0), reverse=True)[:6]
     return render_template(
         "index.html",
@@ -747,160 +717,144 @@ def browse():
     )
 
 
-@app.route("/book-details/<title>")
-def book_details(title):
-    # Find the book from demo+DB
-    book = next((b for b in all_books_ui() 
-                 if (b.get("title") or "").lower() == (title or "").lower()), None)
+def _display_name(user) -> str:
+    """How a reviewer is shown: their handle, else their name, else "reader"."""
+    if not user:
+        return "reader"
+    return (user.handle or user.name or "").strip() or "reader"
 
-    if not book:
-        flash("Book not found.", "error")
-        return redirect(url_for("browse"))
 
-    # REAL reviews from DB for this book title (latest first)
-    real_reviews = (
+def _book_dict(bk: Book, avg_rating: float) -> dict:
+    """The shape the templates expect for one book."""
+    built = _ol_cover_url(cover_i=str(bk.cover_i or ""), isbn=str(bk.isbn or ""), olid=str(bk.olid or ""))
+    return {
+        "id": bk.id,
+        "title": bk.title,
+        "author": bk.author,
+        "genre": bk.genre or "Other",
+        "year": bk.year or "",
+        "cover": built or safe_cover_url(bk.cover) or PLACEHOLDER_COVER,
+        "rating": avg_rating,
+    }
+
+
+def _average_rating(book_id: int) -> float:
+    avg = db.session.query(func.avg(Review.rating)).filter(Review.book_id == book_id).scalar()
+    return float(avg or 0.0)
+
+
+@app.route("/book-details/<path:title>")
+def book_details_by_title(title):
+    """Old title-based links still work: send them to the book's new address."""
+    bk = (
+        Book.query.filter_by(title=title).order_by(Book.id).first()
+        or Book.query.filter(func.lower(Book.title) == title.lower()).order_by(Book.id).first()
+    )
+    if not bk:
+        abort(404)
+    return redirect(url_for("book_details", book_id=bk.id), code=301)
+
+
+@app.route("/books/<int:book_id>")
+def book_details(book_id):
+    bk = db.get_or_404(Book, book_id)
+
+    latest_reviews = (
         Review.query
-        .filter(Review.book_title == book["title"])
+        .filter_by(book_id=bk.id)
         .order_by(Review.created.desc())
         .limit(25)
         .all()
     )
-
-    bk_row = get_or_create_book_row(book)
-    book_id = bk_row.id if bk_row else None
-
-    # Compute REAL average rating
-    avg = (
-        db.session.query(func.avg(Review.rating))
-        .filter(Review.book_title == book["title"])
-        .scalar()
-    )
-    avg_rating = float(avg or 0.0)
-
-    # Update the book dict rating so  template shows the real avg
-    book = dict(book)  
-    book["rating"] = avg_rating
-
-    # Convert Review rows into the dict shape the template expects
-    reviews_for_template = []
-    for r in real_reviews:
-        # prefer handle if available, else name, else email prefix
-        display_user = ""
-        if r.user:
-            display_user = (r.user.handle or r.user.name or (r.user.email.split("@")[0] if r.user.email else "")).strip()
-        if not display_user:
-            display_user = "reader"
-
-        reviews_for_template.append({
-            "user": display_user,
-            "rating": int(r.rating or 0),
+    reviews_for_template = [
+        {
+            "user": _display_name(r.user),
+            "rating": r.rating,
             "text": (r.text or "").strip(),
             "age": _time_ago(r.created),
-        })
+        }
+        for r in latest_reviews
+    ]
 
-    # Best-effort real description 
-    description = _ol_description_for(book.get("title", ""), book.get("author", "")) or (
-        "A gripping, imaginative novel that explores power, control, and identity. "
-        "This edition features a modern cover while preserving the timeless themes."
-    )
-
-    # Optional recommendations 
-    top_rated = sorted(all_books_ui(), key=lambda b: b.get("rating", 0.0), reverse=True)[:8]
+    # Shown only when Open Library has one. The old made-up fallback text is gone.
+    description = _ol_description_for(bk.title, bk.author)
 
     return render_template(
         "book_details.html",
-        book=book,
-        book_id=book_id,
+        book=_book_dict(bk, _average_rating(bk.id)),
+        book_id=bk.id,
         description=description,
         reviews=reviews_for_template,
-        top_rated=top_rated,
     )
 
-@app.route("/book/<title>/reviews")
-def book_reviews(title):
-    # Find the book from demo+DB 
-    book = next(
-        (b for b in all_books_ui()
-         if (b.get("title") or "").lower() == (title or "").lower()),
-        None
-    )
 
-    if not book:
-        flash("Book not found.", "error")
-        return redirect(url_for("browse"))
-
-    # All REAL reviews for this book (newest first)
-    rows = (
-        Review.query
-        .filter(Review.book_title == book["title"])
-        .order_by(Review.created.desc())
-        .all()
-    )
-
-    # Avg + count
-    avg = (
-        db.session.query(func.avg(Review.rating))
-        .filter(Review.book_title == book["title"])
-        .scalar()
-    )
-    avg_rating = float(avg or 0.0)
-    review_count = len(rows)
-
-    # Template-friendly shape 
-    reviews = []
-    for r in rows:
-        display_user = ""
-        if r.user:
-            display_user = (
-                r.user.handle or r.user.name or (r.user.email.split("@")[0] if r.user.email else "")
-            ).strip()
-        if not display_user:
-            display_user = "reader"
-
-        reviews.append({
-            "user": display_user,
-            "rating": int(r.rating or 0),
+@app.route("/books/<int:book_id>/reviews")
+def book_reviews(book_id):
+    bk = db.get_or_404(Book, book_id)
+    rows = Review.query.filter_by(book_id=bk.id).order_by(Review.created.desc()).all()
+    reviews = [
+        {
+            "user": _display_name(r.user),
+            "rating": r.rating,
             "text": (r.text or "").strip(),
             "created": r.created,
-        })
-
+        }
+        for r in rows
+    ]
     return render_template(
         "book_reviews.html",
-        book=book,
+        book=_book_dict(bk, _average_rating(bk.id)),
         reviews=reviews,
-        avg_rating=avg_rating,
-        review_count=review_count,
+        avg_rating=_average_rating(bk.id),
+        review_count=len(rows),
     )
 
+
+def _parse_rating(raw) -> int | None:
+    """Turn the submitted rating into 1-5, or None if it isn't a valid rating."""
+    try:
+        rating = int(raw)
+    except (TypeError, ValueError):
+        return None
+    return rating if 1 <= rating <= 5 else None
 
 
 @app.route("/add-review", methods=["GET", "POST"])
 @login_required
 def add_review():
     if request.method == "POST":
-        book_title = (request.form.get("book_title") or "").strip()
         review_text = (request.form.get("review") or "").strip()
-        rating = int(request.form.get("rating") or 0)
-
-        bk = next((b for b in all_books_ui() if (b.get("title") or "").lower() == book_title.lower()), None)
+        rating = _parse_rating(request.form.get("rating"))
+        try:
+            book_id = int(request.form.get("book_id") or 0)
+        except ValueError:
+            book_id = 0
+        bk = db.session.get(Book, book_id) if book_id else None
 
         if not bk or not review_text:
             flash("Pick a book and write a review first.", "error")
             return redirect(url_for("add_review"))
+        if rating is None:
+            flash("Choose a rating from 1 to 5 stars.", "error")
+            return redirect(url_for("add_review"))
+        if Review.query.filter_by(user_id=current_user.id, book_id=bk.id).first():
+            flash("You've already reviewed this book.", "error")
+            return redirect(url_for("book_details", book_id=bk.id))
 
-        review = Review(
+        cover = _book_dict(bk, 0.0)["cover"]
+        db.session.add(Review(
             user_id=current_user.id,
-            book_title=bk["title"],
-            book_author=bk.get("author", ""),
-            book_cover=bk.get("cover", ""),
+            book_id=bk.id,
+            book_title=bk.title,
+            book_author=bk.author,
+            book_cover=cover,
             rating=rating,
             text=review_text,
-        )
-        db.session.add(review)
+        ))
         db.session.commit()
 
         flash("Thanks for your review!", "ok")
-        return redirect(url_for("profile_page"))
+        return redirect(url_for("book_details", book_id=bk.id))
 
     return render_template("add_review.html", books=all_books_ui())
 
@@ -964,6 +918,7 @@ def favourites():
         if q and (q not in (b.title or "").lower()) and (q not in (b.author or "").lower()):
             continue
         books.append({
+            "id": b.id,
             "title": b.title,
             "author": b.author,
             "cover": b.cover or PLACEHOLDER_COVER,
@@ -1016,6 +971,7 @@ def history():
         if q and (q not in (b.title or "").lower()) and (q not in (b.author or "").lower()):
             continue
         books.append({
+            "id": b.id,
             "title": b.title,
             "author": b.author,
             "cover": b.cover or PLACEHOLDER_COVER,
@@ -1285,7 +1241,14 @@ def edit_profile():
 @app.route("/share-profile")
 def share_profile():
     user = {"name": current_user_name(), "handle": current_user_handle()}
-    return render_template("share_profile.html", user=user, books=BOOKS)
+    books = []
+    if current_user.is_authenticated:
+        reviewed = (
+            Review.query.filter_by(user_id=current_user.id)
+            .order_by(Review.created.desc()).limit(10).all()
+        )
+        books = [_book_dict(r.book, _average_rating(r.book_id)) for r in reviewed]
+    return render_template("share_profile.html", user=user, books=books)
 
 
 @app.route("/qr-profile")
@@ -1305,8 +1268,13 @@ def qr_profile():
 @app.route("/public/<handle>")
 def public_profile(handle):
     shown_handle = f"@{handle}" if not handle.startswith("@") else handle
-    user = {"name": current_user_name(), "handle": shown_handle}
-    return render_template("profile.html", user=user, your_reviews=BOOKS)
+    owner = User.query.filter_by(handle=shown_handle).order_by(User.id).first_or_404()
+    user = {"name": owner.name or "", "handle": owner.handle or "", "bio": owner.bio or ""}
+    reviews = (
+        Review.query.filter_by(user_id=owner.id)
+        .order_by(Review.created.desc()).limit(6).all()
+    )
+    return render_template("profile.html", user=user, your_reviews=reviews)
 
 
 @app.route("/settings")
@@ -1419,6 +1387,7 @@ def api_search_books():
 
     results = [
         {
+            "id": b.get("id"),
             "title": b.get("title", ""),
             "author": b.get("author", ""),
             "cover": b.get("cover", ""),
