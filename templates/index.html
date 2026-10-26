@@ -1,173 +1,355 @@
 {% extends "base.html" %}
 
-{# Top app bar: your Figma shows no title here, so we keep it empty #}
-{% block appbar %}{% endblock %}
+
+{% block appbar %}
+<style>
+  .appbar{
+    background:#fff !important;
+    border-bottom:1px solid rgba(0,0,0,0.06) !important;
+    backdrop-filter:none !important;
+    display:grid !important;
+    grid-template-columns:44px 1fr 44px;
+    align-items:center;
+  }
+
+  .brand{
+    text-align:center;
+    font-size:18px;
+    font-weight:700;
+    letter-spacing:-0.01em;
+    color:#111;
+  }
+</style>
+
+<div></div>
+<div class="brand">BookBuddy</div>
+<div></div>
+{% endblock %}
+
 
 {% block content %}
 <style>
-  /* ---------- page layout ---------- */
-  .home-wrap{ padding: 0 16px 24px; }
-
-  /* ---------- top chips row (Favourites / History / Following / trailing icon) ---------- */
-  .chips-row{
-    display:flex; gap:8px; padding:0 4px 12px; align-items:center; overflow:auto hidden;
+  .wrap{
+    padding: 14px 16px 28px;
+    max-width: 520px;
+    margin: 0 auto;
   }
+
+  /* Search pill (same system as Favourites) */
+  .f-search{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    height:44px;
+    padding:0 14px;
+    border-radius:14px;
+    background:#fff;
+    border:1px solid rgba(0,0,0,0.06);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+  }
+  .f-search .icon{
+    width:18px; height:18px;
+    color: rgba(0,0,0,0.45);
+    flex:0 0 18px;
+  }
+  .f-search input{
+    width:100%;
+    border:0 !important;
+    outline:0 !important;
+    background:transparent !important;
+    box-shadow:none !important;
+    -webkit-appearance:none;
+    appearance:none;
+    font-size:15px;
+    font-family:inherit;
+    color:#111;
+    padding:0 !important;
+    margin:0 !important;
+  }
+  .f-search input::placeholder{ color: rgba(0,0,0,0.45); }
+
+  /* Top chips row (swipeable, no scrollbar) */
+  .chips{
+    display:flex;
+    gap:10px;
+    overflow-x:auto;
+    padding: 10px 2px 6px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width:none;
+    -ms-overflow-style:none;
+  }
+  .chips::-webkit-scrollbar{ width:0; height:0; display:none; }
+
   .chip{
-    display:inline-flex; align-items:center; gap:8px;
-    padding:8px 12px; border-radius:999px; background:#fff; box-shadow:var(--shadow);
-    text-decoration:none; color:inherit; white-space:nowrap;
-  }
-  .chip .icon{ width:16px; height:16px; display:block; color:#6B7280; }
-
-  .chip.trailing{
-    margin-left:auto; padding:8px; width:36px; height:36px; justify-content:center;
-  }
-
-  /* ---------- search ---------- */
-  .search-wrap{ padding:0 0 12px; }
-  .search{
-    display:flex; align-items:center; gap:10px;
-    background:#fff; border-radius:12px; padding:10px 12px; box-shadow:var(--shadow);
-  }
-  .search .icon{ width:18px; height:18px; display:block; color:#9CA3AF; flex:0 0 18px; }
-  .search input{
-    border:0; outline:0; width:100%; font-size:14px; background:transparent;
-  }
-
-  /* ---------- section headers ---------- */
-  .section{ margin:12px 0 8px; display:flex; align-items:center; justify-content:space-between; }
-  .section .title{
+    flex:0 0 auto;
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    height:36px;
+    padding:0 12px;
+    border-radius:12px;
+    background:#fff;
+    border:1px solid rgba(0,0,0,0.08);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+    text-decoration:none;
+    color:#111;
     font-size:14px;
-    font-weight:400;
-    color:var(--text);
+    white-space:nowrap;
   }
-  .section .seeall{ font-size:12px; color:#6B7280; text-decoration:none; }
+  .chip .cicon{ width:18px; height:18px; color:#111; opacity:.85; }
 
-  /* ---------- featured banner ---------- */
+  /* Section headers */
+  .h{
+    font-size:18px;
+    font-weight:625;
+    color:#111;
+    margin: 14px 0 10px;
+    letter-spacing:-0.01em;
+  }
+  .row-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin: 16px 0 10px;
+  }
+  .row-head .title{
+    font-size:18px;
+    font-weight:625;
+    color:#111;
+    letter-spacing:-0.01em;
+  }
+  .row-head .seeall{
+    font-size:13px;
+    color: rgba(0,0,0,0.55);
+    text-decoration:none;
+  }
+
+  /* Featured */
   .featured{
-    width:100%; border-radius:12px; overflow:hidden; box-shadow:var(--shadow); background:#fff;
+    display:block;
+    width:100%;
+    border-radius:16px;
+    overflow:hidden;
+    box-shadow: 0 10px 24px rgba(0,0,0,0.10);
+    background: rgba(0,0,0,0.06);
   }
-  .featured img{ width:100%; height:160px; object-fit:cover; display:block; }
+  .featured img{
+    width:100%;
+    height:160px;
+    object-fit:cover;
+    display:block;
+  }
 
-  /* ---------- genre chips (round) ---------- */
+  /* Genre circles */
   .genres{
-    display:flex; gap:14px; overflow:auto hidden; padding:6px 2px 4px;
+    display:flex;
+    gap:18px;
+    overflow-x:auto;
+    padding: 4px 2px 2px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width:none;
+    -ms-overflow-style:none;
   }
-  .gchip{
-    text-decoration:none; color:inherit; display:flex; flex-direction:column; align-items:center; gap:6px;
-  }
-  .gchip .circle{
-    width:68px; height:68px; border-radius:50%; background:#fff; box-shadow:var(--shadow); display:flex; align-items:center; justify-content:center;
-  }
-  .gchip span{ font-size:12px; color:#374151; }
+  .genres::-webkit-scrollbar{ width:0; height:0; display:none; }
 
-  /* ---------- top rated grid ---------- */
+  .g{
+    flex:0 0 auto;
+    text-decoration:none;
+    color:#111;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:8px;
+    min-width:74px;
+  }
+  .g .circle{
+    width:70px;
+    height:70px;
+    border-radius:999px;
+    overflow:hidden;
+    background:#fff;
+    border:1px solid rgba(0,0,0,0.08);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .g .circle img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    display:block;
+  }
+  .g .circle .letter{
+    font-weight:750;
+    color: rgba(0,0,0,0.55);
+  }
+  .g .label{
+    font-size:15px;
+    font-weight:500;
+    letter-spacing:-0.01em;
+    text-align:center;
+    white-space:nowrap;
+  }
+
+  /* Top rated grid (same proportions as Favourites: no white card behind) */
   .grid{
-    display:grid; grid-template-columns:repeat(2, 1fr); gap:16px;
-    padding-top:6px;
+    display:grid;
+    grid-template-columns:repeat(2, 1fr);
+    gap:16px 16px;
+    margin-top:10px;
   }
-  .card{
-    text-decoration:none; color:inherit; background:#fff; border-radius:12px; overflow:hidden; box-shadow:var(--shadow); display:block;
+
+  .tile{
+    display:block;
+    text-decoration:none;
+    color:inherit;
+    background:transparent !important;
+    border:none !important;
+    box-shadow:none !important;
+    padding:0 !important;
   }
-  .card img{ width:100%; height:180px; object-fit:cover; display:block; }
-  .meta{ padding:8px; }
-  .meta .rating{ font-size:12px; color:#6B7280; margin-bottom:4px; }
-  .meta .title{
-    font-size:14px;
-    font-weight:400;
-    line-height:1.25;
-    margin:0 0 2px;
+
+  .cover{
+    width:100%;
+    height:170px;
+    object-fit:cover;
+    display:block;
+    border-radius:16px;
+    background: rgba(0,0,0,0.06);
+  }
+
+  .meta{ margin-top:6px; }
+  .rating{
+    font-size:12px;
+    color: rgba(0,0,0,0.45);
+    margin-bottom:2px;
+    line-height:1.2;
+  }
+  .title{
+    font-size:16px;
+    font-weight:550;
+    line-height:1.32;
+    letter-spacing:-0.01em;
+    margin-bottom:2px;
+    padding-bottom:2px;
+
     overflow:hidden;
     display:-webkit-box;
     -webkit-box-orient:vertical;
-    -webkit-line-clamp:2; /* chromium/safari */
-    line-clamp:2;         /* standard (linter hint) */
+    -webkit-line-clamp:2;
+    line-clamp:2;
   }
-  .meta .author{ font-size:12px; color:#6B7280; }
+  .author{
+    font-size:13px;
+    line-height:1.2;
+    color: rgba(0,0,0,0.55);
+
+    overflow:hidden;
+    display:-webkit-box;
+    -webkit-box-orient:vertical;
+    -webkit-line-clamp:1;
+    line-clamp:1;
+  }
 </style>
 
-<div class="home-wrap">
+<div class="wrap">
 
-<!-- top chips row -->
-<div class="chips-row">
-  <a class="chip" href="{{ url_for('favourites') }}">
-    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 1 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/>
+  <!-- Search (at top, like Figma) -->
+  <form class="f-search" action="{{ url_for('browse') }}" method="get">
+    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+      <circle cx="11" cy="11" r="7"></circle>
+      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
     </svg>
-    Favourites
-  </a>
-  <a class="chip" href="{{ url_for('history') }}">
-    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <polyline points="1 4 1 10 7 10"></polyline>
-      <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
-      <polyline points="12 7 12 12 15 15"></polyline>
-    </svg>
-    History
-  </a>
-  <a class="chip" href="{{ url_for('following') }}">
-    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-      <circle cx="12" cy="7" r="4"></circle>
-    </svg>
-    Following
-  </a>
-  <a class="chip" href="{{ url_for('followers') }}">
-    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-      <circle cx="12" cy="7" r="4"></circle>
-    </svg>
-    Followers
-  </a>
-</div>
+    <input name="q" placeholder="Search" autocomplete="off">
+  </form>
 
-  <!-- search -->
-  <div class="search-wrap">
-    <form class="search" action="{{ url_for('browse') }}" method="get">
-      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="11" cy="11" r="7"></circle>
-        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+  <!-- Quick links chips row (under search, like Figma) -->
+  <div class="chips" aria-label="Quick links">
+    <a class="chip" href="{{ url_for('favourites') }}">
+      <svg class="cicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 1 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/>
       </svg>
-      <input id="q" name="q" type="text" placeholder="Search">
-    </form>
+      Favourites
+    </a>
+
+    <a class="chip" href="{{ url_for('history') }}">
+      <svg class="cicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <polyline points="1 4 1 10 7 10"></polyline>
+        <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+        <polyline points="12 7 12 12 15 15"></polyline>
+      </svg>
+      History
+    </a>
+
+    <a class="chip" href="{{ url_for('following') }}">
+      <svg class="cicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+        <circle cx="12" cy="7" r="4"></circle>
+      </svg>
+      Following
+    </a>
+
+    <a class="chip" href="{{ url_for('followers') }}">
+      <svg class="cicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+        <circle cx="12" cy="7" r="4"></circle>
+      </svg>
+      Followers
+    </a>
   </div>
 
-  <!-- featured -->
+  <!-- Featured -->
+  <div class="h">Featured Book</div>
   <a class="featured" href="{{ url_for('book_details', title=featured.title) }}">
-  <img
-    src="{{ featured.cover }}"
-    alt="{{ featured.title }}"
-    onerror="this.onerror=null;this.src='https://placehold.co/400x600/EEE/AAA?text=No+Cover';"
-  >
-</a>
+    <img
+      src="{{ featured.cover }}"
+      alt="{{ featured.title }}"
+      onerror="this.onerror=null;this.src='https://placehold.co/800x400/EEE/AAA?text=No+Cover';"
+    >
+  </a>
 
-
-  <!-- search by genre -->
-  <div class="section" style="margin-top:14px;">
-    <div class="title">Search by Genre</div>
+  <!-- Search by genre -->
+  <div class="row-head" style="margin-top:18px;">
+    <div class="title">Search By Genre</div>
     <a class="seeall" href="{{ url_for('browse') }}">See all</a>
   </div>
-  <div class="genres">
+
+  <div class="genres" aria-label="Genres">
     {% for g in genres %}
-      <a class="gchip" href="{{ url_for('genre_page', name=g) }}">
-        <div class="circle">{{ g[0] }}</div>
-        <span>{{ g }}</span>
+      <a class="g" href="{{ url_for('browse', genre=g) }}">
+        <div class="circle">
+          {# If you pass a dict called genre_covers (genre -> image url), we'll use it. Otherwise fallback to a letter. #}
+          {% if genre_covers is defined and genre_covers.get(g) %}
+            <img
+              src="{{ genre_covers.get(g) }}"
+              alt="{{ g }}"
+              onerror="this.onerror=null;this.parentElement.innerHTML='<div class=&quot;letter&quot;>{{ g[0] }}</div>';"
+            >
+          {% else %}
+            <div class="letter">{{ g[0] }}</div>
+          {% endif %}
+        </div>
+        <div class="label">{{ g }}</div>
       </a>
     {% endfor %}
   </div>
 
-  <!-- top rated -->
-  <div class="section" style="margin-top:18px;">
+  <!-- Top rated -->
+  <div class="row-head" style="margin-top:18px;">
     <div class="title">Top Rated Books</div>
     <a class="seeall" href="{{ url_for('top_rated') }}">See all</a>
   </div>
+
   <div class="grid">
     {% for b in top_rated %}
-      <a class="card" href="{{ url_for('book_details', title=b.title) }}">
+      <a class="tile" href="{{ url_for('book_details', title=b.title) }}">
         <img
-  src="{{ b.cover }}"
-  alt="{{ b.title }}"
-  onerror="this.onerror=null;this.src='{{ PLACEHOLDER_COVER }}';">
-
+          class="cover"
+          src="{{ b.cover }}"
+          alt="{{ b.title }}"
+          onerror="this.onerror=null;this.src='https://placehold.co/400x600/EEE/AAA?text=No+Cover';"
+        >
         <div class="meta">
           <div class="rating">{{ '%.2f'|format(b.rating) }} avg rating</div>
           <div class="title">{{ b.title }}</div>

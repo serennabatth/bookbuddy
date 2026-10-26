@@ -1,134 +1,192 @@
 {% extends "base.html" %}
 
 {% block appbar %}
+<style>
+  /* White header  */
+  .appbar{
+    background:#fff !important;
+    border-bottom: 1px solid rgba(0,0,0,0.06) !important;
+    backdrop-filter:none !important;
+  }
+  .appbar{
+    display:grid !important;
+    grid-template-columns: 44px 1fr 44px;
+    align-items:center;
+  }
+  .navicon{
+    background:transparent !important;
+    border:none !important;
+    box-shadow:none !important;
+    width:44px !important;
+    height:44px !important;
+    border-radius:0 !important;
+    padding:0 !important;
+    color:#111 !important;
+  }
+  .h1{ text-align:center; }
+</style>
+
   <a class="navicon" href="{{ url_for('home') }}" aria-label="Back">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <polyline points="15 18 9 12 15 6"></polyline>
     </svg>
   </a>
   <div class="h1">Favourites</div>
+  <div aria-hidden="true"></div>
 {% endblock %}
 
 {% block content %}
 <style>
-  .wrap { padding: 0 16px 24px; }
-
-  /* Search */
-  .search{
-    display:flex; align-items:center; gap:10px;
-    background:var(--card);
-    border-radius:12px;
-    padding:10px 12px;
-    box-shadow:var(--shadow);
-    border:1px solid var(--border);
-  }
-  .search .icon{ width:18px; height:18px; color:var(--text-2); flex:0 0 18px; }
-  .search input{
-    border:0; outline:0; width:100%;
-    font-size:14px; background:transparent; color:var(--text);
+  .wrap{
+    padding: 14px 16px 28px;
+    max-width: 520px;
+    margin: 0 auto;
   }
 
-  .meta-row{
-    display:flex; justify-content:space-between; align-items:center;
-    margin:10px 0;
-    font-size:12px; color:var(--text-2);
+  /* Search pill  */
+  .f-search{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    height:44px;
+    padding:0 14px;
+    border-radius:14px;
+    background:#fff;
+    border: 1px solid rgba(0,0,0,0.06);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.06);
   }
+  .f-search .icon{
+    width:18px; height:18px;
+    color: rgba(0,0,0,0.45);
+    flex:0 0 18px;
+  }
+  .f-search input{
+    width:100%;
+    border:0 !important;
+    outline:0 !important;
+    background:transparent !important;
+    box-shadow:none !important;
+    -webkit-appearance:none;
+    appearance:none;
+    font-size:15px;
+    color:#111;
+    padding:0 !important;
+    margin:0 !important;
+  }
+  .f-search input::placeholder{ color: rgba(0,0,0,0.45); }
 
-  /* Grid */
-  .grid{
+  /* Grid: no card background */
+  .f-grid{
     display:grid;
     grid-template-columns:repeat(2, 1fr);
-    gap:16px;
+    gap:16px 16px;
+    margin-top:14px;
   }
-  .card{
-    text-decoration:none; color:inherit;
-    background:var(--card);
-    border-radius:12px;
-    overflow:hidden;
-    box-shadow:var(--shadow);
-    border:1px solid var(--border);
+
+  .f-tile{
     display:block;
+    text-decoration:none;
+    color:inherit;
+    background:transparent !important;
+    border:none !important;
+    box-shadow:none !important;
+    padding:0 !important;
   }
-  .card img{
+
+  .f-cover{
     width:100%;
-    height:180px;
+    height:170px;
     object-fit:cover;
     display:block;
-    background:var(--muted);
+    border-radius:16px;
+    background: rgba(0,0,0,0.06);
   }
-  .meta{ padding:8px; }
-  .meta .rating{ font-size:12px; color:var(--text-2); margin-bottom:4px; }
-  .meta .title{
-    font-size:14px; font-weight:600; line-height:1.25;
+
+  /* Tighter meta spacing */
+  .f-meta{ margin-top:6px; }
+
+  .f-rating{
+    font-size:12px;
+    color: rgba(0,0,0,0.45);
+    margin-bottom:2px;
+    line-height:1.2;
+  }
+
+  .f-title{
+    font-size:16px;
+    font-weight:550;
+    line-height:1.32;
+    letter-spacing:-0.01em;
+    margin-bottom:2px;
+    padding-bottom:2px; /* anti-clipping */
+
     overflow:hidden;
     display:-webkit-box;
     -webkit-box-orient:vertical;
     -webkit-line-clamp:2;
     line-clamp:2;
   }
-  .meta .author{ font-size:12px; color:var(--text-2); }
 
-  /* Empty state */
+  .f-author{
+    font-size:13px;
+    line-height:1.2;
+
+    overflow:hidden;
+    display:-webkit-box;
+    -webkit-box-orient:vertical;
+    -webkit-line-clamp:1;
+    line-clamp:1;
+  }
+
   .empty{
     margin-top:16px;
-    background:var(--card);
-    border:1px solid var(--border);
-    border-radius:16px;
-    box-shadow:var(--shadow);
-    padding:18px;
     text-align:center;
-    color:var(--text-2);
+    color: rgba(0,0,0,0.55);
+    padding:18px 10px;
   }
   .empty .t{
-    font-weight:700;
-    color:var(--text);
+    color:#111;
+    font-weight:750;
     margin-bottom:6px;
+    font-size:16px;
   }
 </style>
 
 <div class="wrap">
 
+  {% set q = (request.args.get('q') or '') %}
+  {% set ql = q | lower %}
+
   <!-- search -->
-  <form class="search" action="{{ url_for('favourites') }}" method="get">
+  <form class="f-search" action="{{ url_for('favourites') }}" method="get">
     <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <circle cx="11" cy="11" r="7"></circle>
       <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
     </svg>
-    <input name="q" value="{{ q or '' }}" placeholder="Search favourites">
+    <input name="q" value="{{ q|e }}" placeholder="Search" autocomplete="off">
   </form>
 
-  {% set ql = (q or '') | lower %}
   {% set filtered = [] %}
   {% for b in books %}
-    {% if not ql or ql in b.title|lower or ql in b.author|lower %}
+    {% if not ql or ql in (b.title|lower) or ql in (b.author|lower) %}
       {% set _ = filtered.append(b) %}
     {% endif %}
   {% endfor %}
 
-  <div class="meta-row">
-    <div>{{ filtered|length }} saved</div>
-    {% if q %}
-      <div>Searching: “{{ q }}”</div>
-    {% endif %}
-  </div>
-
   {% if filtered and filtered|length %}
-    <div class="grid">
+    <div class="f-grid">
       {% for b in filtered %}
-        <a class="card" href="{{ url_for('book_details', title=b.title) }}">
+        <a class="f-tile" href="{{ url_for('book_details', title=b.title) }}">
           <img
-          src="{{ b.cover }}"
-          alt="{{ b.title }}"
-          onerror="this.onerror=null;this.src='https://placehold.co/400x600/EEE/AAA?text=No+Cover';"
+            class="f-cover"
+            src="{{ b.cover }}"
+            alt="{{ b.title }}"
+            onerror="this.onerror=null;this.src='https://placehold.co/400x600/EEE/AAA?text=No+Cover';"
           >
-
-
-
-          <div class="meta">
-            <div class="rating">{{ '%.2f'|format(b.get('rating', 0)) }} avg rating</div>
-            <div class="title clamp-2">{{ b.title }}</div>
-            <div class="author clamp-1">{{ b.author }}</div>
-
+          <div class="f-meta">
+            <div class="f-rating">{{ '%.2f'|format(b.get('rating', 0)) }} avg rating</div>
+            <div class="f-title">{{ b.title }}</div>
+            <div class="f-author">{{ b.author }}</div>
           </div>
         </a>
       {% endfor %}
