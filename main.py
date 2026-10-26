@@ -1,16 +1,9 @@
 from flask import (
     Flask, render_template, request, redirect, url_for,
-    flash, send_file, jsonify, session, abort
+    flash, send_file, jsonify, abort
 )
-from flask_sqlalchemy import SQLAlchemy
-from flask_login import (
-    LoginManager, UserMixin, login_user, login_required,
-    current_user, logout_user
-)
-from werkzeug.security import generate_password_hash, check_password_hash
-from dotenv import load_dotenv
-from flask_migrate import Migrate
-from flask_wtf.csrf import CSRFProtect, CSRFError
+from flask_login import login_user, login_required, current_user, logout_user
+from flask_wtf.csrf import CSRFError
 from io import BytesIO
 import qrcode
 from PIL import Image, UnidentifiedImageError
@@ -21,11 +14,9 @@ import secrets
 import threading
 import time
 from collections import defaultdict, deque
-import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
-from sqlalchemy import event, func, or_
-from sqlalchemy.engine import Engine
+from sqlalchemy import func, or_
 from urllib.parse import quote, urlparse
 from urllib.request import urlopen, Request
 import json
@@ -33,88 +24,26 @@ from dataclasses import dataclass
 import csv
 import click
 
+from app.config import get_config
+from app.extensions import csrf, db, login_manager, migrate
+from app.models import Book, Favourite, Follow, History, Review, User  # noqa: F401
+
 
 # -----------------------------------------------------------------------------
 # App & DB
 # -----------------------------------------------------------------------------
-# Read settings from a .env file in the project folder, if there is one.
-# Real environment variables always win over values in .env.
-load_dotenv()
-
+# config, extensions and models are in the app/ folder
 app = Flask(__name__)
 
-# "development" (default), "testing" or "production"
-APP_ENV = os.environ.get("BOOKBUDDY_ENV", "development").strip().lower()
-IS_PRODUCTION = APP_ENV == "production"
-
-
-def _load_secret_key() -> str:
-    """Return the key Flask uses to sign session cookies and reset tokens.
-
-    Anyone who knows this key can forge a login cookie, so it must never be
-    a fixed value in the code. In production the app refuses to start
-    without one.
-    """
-    key = (os.environ.get("SECRET_KEY") or os.environ.get("BOOKBUDDY_SECRET") or "").strip()
-    if key:
-        return key
-    if IS_PRODUCTION:
-        raise RuntimeError("SECRET_KEY must be set when BOOKBUDDY_ENV=production.")
-    app.logger.warning(
-        "SECRET_KEY is not set, so a temporary random key is being used and "
-        "everyone is logged out when the server restarts. Set SECRET_KEY in .env."
-    )
-    return secrets.token_hex(32)
-
-
-app.config["SECRET_KEY"] = _load_secret_key()
-
+config_class = get_config()
+app.config.from_object(config_class)
+config_class.init_app(app)
 os.makedirs(app.instance_path, exist_ok=True)
-app.config["SQLALCHEMY_DATABASE_URI"] = (
-    os.environ.get("DATABASE_URL")
-    or "sqlite:///" + os.path.join(app.instance_path, "bookbuddy.db")
-)
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-# Cookies: never readable by JavaScript, not sent on cross-site requests, and
-# (in production, where the site is HTTPS) only ever sent over HTTPS.
-app.config.update(
-    SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SAMESITE="Lax",
-    SESSION_COOKIE_SECURE=IS_PRODUCTION,
-    REMEMBER_COOKIE_HTTPONLY=True,
-    REMEMBER_COOKIE_SAMESITE="Lax",
-    REMEMBER_COOKIE_SECURE=IS_PRODUCTION,
-    REMEMBER_COOKIE_DURATION=timedelta(days=30),
-    RATE_LIMITS_ENABLED=(APP_ENV != "testing"),
-)
 
-# Reject any request bigger than 2 MB (Flask answers 413 before reading it all).
-app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024
-
-db = SQLAlchemy(app)
-# render_as_batch lets Alembic change columns on SQLite, which can't ALTER
-# most things in place: it copies the table, changes it and swaps it back.
-migrate = Migrate(app, db, render_as_batch=True)
-
-
-@event.listens_for(Engine, "connect")
-def _enable_sqlite_foreign_keys(dbapi_connection, connection_record) -> None:
-    """SQLite ignores foreign keys unless told otherwise on every connection.
-
-    With this on, the database itself refuses a review for a book or user
-    that doesn't exist. PostgreSQL always enforces them, so this only
-    matters locally.
-    """
-    if isinstance(dbapi_connection, sqlite3.Connection):
-        cursor = dbapi_connection.cursor()
-        cursor.execute("PRAGMA foreign_keys=ON")
-        cursor.close()
-
-# CSRF protection: every POST must carry a secret token that only pages from
-# this site know, so another website can't submit forms as a logged-in user.
-# Forms send it as a hidden "csrf_token" field; fetch() calls send it in an
-# "X-CSRFToken" header (see base.html).
-csrf = CSRFProtect(app)
+db.init_app(app)
+migrate.init_app(app, db)
+csrf.init_app(app)
+login_manager.init_app(app)
 
 
 @app.errorhandler(CSRFError)
@@ -127,130 +56,6 @@ def handle_csrf_error(error: CSRFError):
     if request.endpoint == "logout":
         return redirect(url_for("home"))
     return redirect(request.path)
-login_manager = LoginManager(app)
-login_manager.login_view = "login"
-
-
-# -----------------------------------------------------------------------------
-# Models
-# -----------------------------------------------------------------------------
-class User(UserMixin, db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    email = db.Column(db.String(255), unique=True, nullable=False, index=True)
-    password_hash = db.Column(db.String(255), nullable=False)
-    name = db.Column(db.String(120), default="")
-    # Stored like "@alexmorgan": lower case, unique, or None if not chosen yet.
-    handle = db.Column(db.String(120), nullable=True, default=None)
-    bio = db.Column(db.Text, default="")
-    # Path inside /static, e.g. "uploads/avatars/user_4_photo.jpg", or "" for none.
-    avatar = db.Column(db.String(255), default="")
-    # Private profiles hide their reviews and lists from everyone else.
-    is_private = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
-
-    # A unique index (not a constraint) so SQLite can add it without rebuilding the table.
-    __table_args__ = (db.Index("uq_user_handle", "handle", unique=True),)
-
-    def set_password(self, pw: str) -> None:
-        self.password_hash = generate_password_hash(pw)
-
-    def check_password(self, pw: str) -> bool:
-        return check_password_hash(self.password_hash, pw)
-
-
-class Review(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
-    user = db.relationship("User", backref=db.backref("reviews", lazy=True))
-
-    # Which book this review is about. Before Phase 3 task 4, reviews were
-    # matched to books by title text, so books with the same title shared reviews.
-    book_id = db.Column(
-        db.Integer, db.ForeignKey("book.id", name="fk_review_book_id_book"),
-        nullable=False, index=True,
-    )
-    book = db.relationship("Book", backref=db.backref("reviews", lazy=True))
-
-    # Copies of the book's details at the time of the review.
-    # Task 5 removes these and reads them from review.book instead.
-    book_title = db.Column(db.String(255), nullable=False)
-    book_author = db.Column(db.String(255), default="")
-    book_cover = db.Column(db.String(500), default="")
-
-    rating = db.Column(db.Integer, nullable=False)
-    text = db.Column(db.Text, default="")
-    created = db.Column(db.DateTime, default=datetime.utcnow)
-
-    __table_args__ = (
-        # One review per reader per book.
-        db.UniqueConstraint("user_id", "book_id", name="uq_review_user_book"),
-        # The database rejects any rating outside 1 to 5, even if a bug lets one through.
-        db.CheckConstraint("rating >= 1 AND rating <= 5", name="ck_review_rating_range"),
-    )
-
-
-class Book(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(255), nullable=False, index=True)
-    author = db.Column(db.String(255), nullable=False, index=True)
-    genre = db.Column(db.String(120), default="Other")
-    year = db.Column(db.String(20), default="")
-    cover = db.Column(db.String(500), default="")
-
-    # Open Library identifiers 
-    olid = db.Column(db.String(50), default="", index=True)     
-    cover_i = db.Column(db.String(50), default="")              
-    isbn = db.Column(db.String(32), default="")                 
-
-    # Fetched from Open Library the first time someone opens the book page.
-    # None = not fetched yet, "" = Open Library has no description.
-    description = db.Column(db.Text, nullable=True)
-
-    __table_args__ = (db.UniqueConstraint("title", "author", name="uq_book_title_author"),)
-
-class Favourite(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
-    book_id = db.Column(db.Integer, db.ForeignKey("book.id"), nullable=False, index=True)
-
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    __table_args__ = (db.UniqueConstraint("user_id", "book_id", name="uq_favourite_user_book"),)
-
-
-class Follow(db.Model):
-    """One reader following another. follower -> followed."""
-    id = db.Column(db.Integer, primary_key=True)
-    follower_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
-    followed_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    follower = db.relationship("User", foreign_keys=[follower_id])
-    followed = db.relationship("User", foreign_keys=[followed_id])
-
-    __table_args__ = (
-        # You can follow someone once...
-        db.UniqueConstraint("follower_id", "followed_id", name="uq_follow_pair"),
-        # ...and never yourself, even if a bug in the app tried to.
-        db.CheckConstraint("follower_id != followed_id", name="ck_follow_not_self"),
-    )
-
-
-class History(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
-    book_id = db.Column(db.Integer, db.ForeignKey("book.id"), nullable=False, index=True)
-
-    viewed_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
-
-    __table_args__ = (db.UniqueConstraint("user_id", "book_id", name="uq_history_user_book"),)
-
-
-@login_manager.user_loader
-def load_user(user_id):
-    return User.query.get(int(user_id))
 
 
 # The database schema is now managed by Flask-Migrate (Alembic).
