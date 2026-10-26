@@ -15,6 +15,7 @@ from io import BytesIO
 import qrcode
 import qrcode.image.pil  # ensure PIL backend available
 import os
+import re
 import secrets
 import sqlite3
 from datetime import datetime
@@ -117,8 +118,13 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(255), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(255), nullable=False)
     name = db.Column(db.String(120), default="")
-    handle = db.Column(db.String(120), default="")  # store like "@serennabatth"
+    # Stored like "@alexmorgan": lower case, unique, or None if not chosen yet.
+    handle = db.Column(db.String(120), nullable=True, default=None)
     bio = db.Column(db.Text, default="")
+    # Path inside /static, e.g. "uploads/avatars/user_4_photo.jpg", or "" for none.
+    avatar = db.Column(db.String(255), default="")
+
+    __table_args__ = (db.UniqueConstraint("handle", name="uq_user_handle"),)
 
     def set_password(self, pw: str) -> None:
         self.password_hash = generate_password_hash(pw)
@@ -234,6 +240,30 @@ def set_pref(key, value):
 # -----------------------------------------------------------------------------
 # Helpers
 # -----------------------------------------------------------------------------
+HANDLE_PATTERN = re.compile(r"[a-z0-9_.]{3,30}")
+
+
+def normalize_handle(raw: str) -> str | None:
+    """Turn what someone typed into a stored handle, e.g. " Alex.Morgan " -> "@alex.morgan".
+
+    Returns None if it isn't valid: 3-30 characters, only letters,
+    numbers, dots and underscores.
+    """
+    body = (raw or "").strip().lstrip("@").lower()
+    return f"@{body}" if HANDLE_PATTERN.fullmatch(body) else None
+
+
+def handle_taken(handle: str, except_user_id: int | None = None) -> bool:
+    """True if another account already uses this handle."""
+    query = User.query.filter_by(handle=handle)
+    if except_user_id is not None:
+        query = query.filter(User.id != except_user_id)
+    return query.first() is not None
+
+
+HANDLE_RULES = "Handles are 3-30 characters: letters, numbers, dots and underscores."
+
+
 def current_user_name() -> str:
     if current_user.is_authenticated and current_user.name:
         return current_user.name
@@ -1155,7 +1185,8 @@ def profile_page():
     user = {
         "name": current_user.name or "",
         "handle": current_user.handle or "",
-        "bio": current_user.bio or ""
+        "bio": current_user.bio or "",
+        "avatar": current_user.avatar or "",
     }
 
     recent = (
@@ -1199,9 +1230,14 @@ def edit_profile():
             current_user.name = new_name
 
         if new_handle:
-            current_user.handle = (
-                new_handle if new_handle.startswith("@") else f"@{new_handle}"
-            )
+            handle = normalize_handle(new_handle)
+            if handle is None:
+                flash(HANDLE_RULES, "error")
+                return redirect(url_for("edit_profile"))
+            if handle_taken(handle, except_user_id=current_user.id):
+                flash(f"{handle} is already taken. Try another handle.", "error")
+                return redirect(url_for("edit_profile"))
+            current_user.handle = handle
 
         current_user.bio = new_bio[:200]
 
@@ -1217,7 +1253,9 @@ def edit_profile():
             allowed_ext = {"png", "jpg", "jpeg", "webp"}
             ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
             if ext in allowed_ext:
-                upload_folder = os.path.join("static", "uploads", "avatars")
+                # app.static_folder is the project's static/ folder wherever the
+                # app is started from (the old relative path depended on that).
+                upload_folder = os.path.join(app.static_folder, "uploads", "avatars")
                 os.makedirs(upload_folder, exist_ok=True)
 
                 
@@ -1253,9 +1291,13 @@ def share_profile():
 
 @app.route("/qr-profile")
 def qr_profile():
-    url = request.args.get("url")
-    if not url:
-        handle = current_user_handle().replace("@", "")
+    # Only make QR codes for links to this site, so the endpoint can't be
+    # used to generate QR codes pointing anywhere on the internet.
+    url = request.args.get("url") or ""
+    if not url.startswith(request.host_url):
+        handle = current_user_handle().lstrip("@")
+        if not handle:
+            abort(404)
         url = url_for("public_profile", handle=handle, _external=True)
 
     img = qrcode.make(url)
@@ -1267,9 +1309,11 @@ def qr_profile():
 
 @app.route("/public/<handle>")
 def public_profile(handle):
-    shown_handle = f"@{handle}" if not handle.startswith("@") else handle
-    owner = User.query.filter_by(handle=shown_handle).order_by(User.id).first_or_404()
-    user = {"name": owner.name or "", "handle": owner.handle or "", "bio": owner.bio or ""}
+    owner = User.query.filter_by(handle=f"@{handle.lstrip('@').lower()}").first_or_404()
+    user = {
+        "name": owner.name or "", "handle": owner.handle or "",
+        "bio": owner.bio or "", "avatar": owner.avatar or "",
+    }
     reviews = (
         Review.query.filter_by(user_id=owner.id)
         .order_by(Review.created.desc()).limit(6).all()
@@ -1409,10 +1453,16 @@ def signup():
         password = (request.form.get("password") or "")
         name = (request.form.get("name") or "").strip() or "New Reader"
         handle_raw = (request.form.get("handle") or "").strip()
-        handle = handle_raw if handle_raw.startswith("@") else f"@{handle_raw}" if handle_raw else ""
+        handle = normalize_handle(handle_raw) if handle_raw else None
 
         if not email or not password:
             flash("Email and password are required.", "error")
+            return redirect(url_for("signup"))
+        if handle_raw and handle is None:
+            flash(HANDLE_RULES, "error")
+            return redirect(url_for("signup"))
+        if handle and handle_taken(handle):
+            flash(f"{handle} is already taken. Try another handle.", "error")
             return redirect(url_for("signup"))
 
         if User.query.filter_by(email=email).first():
