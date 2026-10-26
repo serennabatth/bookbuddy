@@ -133,6 +133,29 @@ class History(db.Model):
     __table_args__ = (db.UniqueConstraint("user_id", "book_id", name="uq_history_user_book"),)
 
 
+class ShelfEntry(db.Model):
+    """A book on one of the user's shelves - each book can only be on one shelf."""
+    __tablename__ = "shelf_entry"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    book_id = db.Column(db.Integer, db.ForeignKey("book.id"), nullable=False, index=True)
+    status = db.Column(db.String(20), nullable=False)   # "want", "reading" or "finished"
+
+    added_at = db.Column(db.DateTime, default=utc_now)
+    started_at = db.Column(db.DateTime, nullable=True)
+    finished_at = db.Column(db.DateTime, nullable=True)
+
+    book = db.relationship("Book")
+
+    __table_args__ = (
+        db.UniqueConstraint("user_id", "book_id", name="uq_shelf_user_book"),
+        db.CheckConstraint("status IN ('want', 'reading', 'finished')", name="ck_shelf_status"),
+        # pages usually ask for "this user's books on this shelf"
+        db.Index("ix_shelf_entry_user_status", "user_id", "status"),
+    )
+
+
 @login_manager.user_loader
 def load_user(user_id: str) -> User | None:
     """Used by Flask-Login to get the logged-in user from the session."""

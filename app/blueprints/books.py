@@ -13,6 +13,7 @@ from app.services.catalogue import (
     average_rating, book_dict, books_with_ratings, paginate_books,
 )
 from app.services.security import safe_cover_url
+from app.services.shelves import PICKER_OPTIONS, shelf_for
 from app.services.users import display_name
 
 bp = Blueprint("books", __name__)
@@ -125,6 +126,7 @@ def book_details(book_id):
     my_review = (
         Review.query.filter_by(user_id=viewer_id, book_id=bk.id).first() if viewer_id else None
     )
+    my_shelf = shelf_for(viewer_id, bk.id) if viewer_id else None
 
     # get the description from Open Library the first time, then save it
     if bk.description is None:
@@ -141,6 +143,8 @@ def book_details(book_id):
         description=description,
         reviews=reviews_for_template,
         my_review_id=my_review.id if my_review else None,
+        shelf=my_shelf.status if my_shelf else None,
+        shelf_options=PICKER_OPTIONS,
     )
 
 

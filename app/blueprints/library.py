@@ -1,10 +1,12 @@
 """The reader's own lists - favourites and recently viewed."""
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, abort, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app.extensions import db
 from app.models import Book, Favourite, History, utc_now
 from app.services.catalogue import book_dict, ratings_for
+from app.services.security import safe_next_url
+from app.services.shelves import SHELVES, set_shelf
 
 bp = Blueprint("library", __name__)
 
@@ -99,3 +101,19 @@ def api_history_add():
         db.session.add(History(user_id=current_user.id, book_id=book.id))
     db.session.commit()
     return jsonify({"ok": True})
+
+
+@bp.post("/books/<int:book_id>/shelf")
+@login_required
+def set_book_shelf(book_id):
+    """Put a book on a shelf, move it, or take it off (empty status).
+
+    A plain form post, so it works without JavaScript. "next" says where to
+    go afterwards (e.g. back to Home after "Finished it").
+    """
+    book = db.get_or_404(Book, book_id)
+    status = (request.form.get("status") or "").strip()
+    if status and status not in SHELVES:
+        abort(400)
+    set_shelf(current_user.id, book.id, status or None)
+    return redirect(safe_next_url(request.form.get("next")) or url_for("books.book_details", book_id=book.id))

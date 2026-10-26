@@ -7,7 +7,7 @@ from flask.cli import with_appcontext
 
 from app.config import BASE_DIR
 from app.extensions import db
-from app.models import Book, Favourite, History, Review
+from app.models import Book, Favourite, History, Review, ShelfEntry
 from app.services import openlibrary
 from app.services.catalogue import PLACEHOLDER_COVER
 from app.services.security import safe_cover_url
@@ -16,10 +16,10 @@ SEED_FILE = os.path.join(BASE_DIR, "data", "books.csv")
 
 
 def _is_referenced(book_id: int) -> bool:
-    """True if the book has any reviews, favourites or history."""
+    """True if the book has any reviews, favourites, history or shelf entries."""
     return any(
         model.query.filter_by(book_id=book_id).first() is not None
-        for model in (Review, Favourite, History)
+        for model in (Review, Favourite, History, ShelfEntry)
     )
 
 
