@@ -4,12 +4,20 @@ After changing a model, create and run a migration:
     flask db migrate -m "what changed"
     flask db upgrade
 """
-from datetime import datetime
+from datetime import datetime, timezone
 
 from flask_login import UserMixin
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.extensions import db, login_manager
+
+
+def utc_now() -> datetime:
+    """Current UTC time without timezone info (the way SQLite stores it).
+
+    Replaces datetime.utcnow(), which is deprecated from Python 3.12.
+    """
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class User(UserMixin, db.Model):
@@ -55,7 +63,7 @@ class Review(db.Model):
 
     rating = db.Column(db.Integer, nullable=False)
     text = db.Column(db.Text, default="")
-    created = db.Column(db.DateTime, default=datetime.utcnow)
+    created = db.Column(db.DateTime, default=utc_now)
 
     __table_args__ = (
         # one review per user per book
@@ -91,7 +99,7 @@ class Favourite(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
     book_id = db.Column(db.Integer, db.ForeignKey("book.id"), nullable=False, index=True)
 
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utc_now)
 
     __table_args__ = (db.UniqueConstraint("user_id", "book_id", name="uq_favourite_user_book"),)
 
@@ -101,7 +109,7 @@ class Follow(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     follower_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
     followed_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utc_now)
 
     follower = db.relationship("User", foreign_keys=[follower_id])
     followed = db.relationship("User", foreign_keys=[followed_id])
@@ -120,12 +128,12 @@ class History(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
     book_id = db.Column(db.Integer, db.ForeignKey("book.id"), nullable=False, index=True)
 
-    viewed_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    viewed_at = db.Column(db.DateTime, default=utc_now, index=True)
 
     __table_args__ = (db.UniqueConstraint("user_id", "book_id", name="uq_history_user_book"),)
 
 
 @login_manager.user_loader
-def load_user(user_id):
+def load_user(user_id: str) -> User | None:
     """Used by Flask-Login to get the logged-in user from the session."""
-    return User.query.get(int(user_id))
+    return db.session.get(User, int(user_id))

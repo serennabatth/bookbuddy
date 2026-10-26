@@ -1,21 +1,32 @@
 """The reader's own lists - favourites and recently viewed."""
-from datetime import datetime
-
 from flask import Blueprint, jsonify, render_template, request
 from flask_login import current_user, login_required
 
 from app.extensions import db
-from app.models import Book, Favourite, History
-from app.services.catalogue import PLACEHOLDER_COVER, ratings_for
+from app.models import Book, Favourite, History, utc_now
+from app.services.catalogue import book_dict, ratings_for
 
 bp = Blueprint("library", __name__)
+
+
+def _matches(book: Book, q: str) -> bool:
+    """True if the search text is in the title or author (or there's no search)."""
+    return not q or q in (book.title or "").lower() or q in (book.author or "").lower()
+
+
+def _book_from_json() -> Book | None:
+    """Get the book from {"book_id": ...} in the request body, or None."""
+    data = request.get_json(silent=True) or {}
+    try:
+        return db.session.get(Book, int(data.get("book_id") or 0))
+    except (TypeError, ValueError):
+        return None
 
 
 @bp.route("/favourites")
 @login_required
 def favourites():
     q = (request.args.get("q") or "").strip().lower()
-
     rows = (
         db.session.query(Book)
         .join(Favourite, Favourite.book_id == Book.id)
@@ -23,39 +34,25 @@ def favourites():
         .order_by(Favourite.created_at.desc())
         .all()
     )
-
     ratings = ratings_for([b.id for b in rows])
-    books = []
-    for b in rows:
-        if q and (q not in (b.title or "").lower()) and (q not in (b.author or "").lower()):
-            continue
-        books.append({
-            "id": b.id,
-            "title": b.title,
-            "author": b.author,
-            "cover": b.cover or PLACEHOLDER_COVER,
-            "rating": ratings.get(b.id, (0.0, 0))[0],
-            "review_count": ratings.get(b.id, (0.0, 0))[1],
-        })
-
+    books = [book_dict(b, *ratings.get(b.id, (0.0, 0))) for b in rows if _matches(b, q)]
     return render_template("favourites.html", books=books, q=q)
 
 
 @bp.post("/api/favourites/toggle")
 @login_required
 def api_favourites_toggle():
-    data = request.get_json(silent=True) or {}
-    book_id = int(data.get("book_id") or 0)
-    if not book_id:
-        return jsonify({"ok": False, "error": "missing book_id"}), 400
+    book = _book_from_json()
+    if book is None:
+        return jsonify({"ok": False, "error": "That book doesn't exist."}), 404
 
-    fav = Favourite.query.filter_by(user_id=current_user.id, book_id=book_id).first()
+    fav = Favourite.query.filter_by(user_id=current_user.id, book_id=book.id).first()
     if fav:
         db.session.delete(fav)
         db.session.commit()
         return jsonify({"ok": True, "favourited": False})
 
-    db.session.add(Favourite(user_id=current_user.id, book_id=book_id))
+    db.session.add(Favourite(user_id=current_user.id, book_id=book.id))
     db.session.commit()
     return jsonify({"ok": True, "favourited": True})
 
@@ -71,7 +68,6 @@ def api_favourites_list():
 @login_required
 def history():
     q = (request.args.get("q") or "").strip().lower()
-
     rows = (
         db.session.query(Book, History.viewed_at)
         .join(History, History.book_id == Book.id)
@@ -80,38 +76,26 @@ def history():
         .limit(100)
         .all()
     )
-
     ratings = ratings_for([b.id for b, _ in rows])
-    books = []
-    for b, viewed_at in rows:
-        if q and (q not in (b.title or "").lower()) and (q not in (b.author or "").lower()):
-            continue
-        books.append({
-            "id": b.id,
-            "title": b.title,
-            "author": b.author,
-            "cover": b.cover or PLACEHOLDER_COVER,
-            "viewed_at": viewed_at,
-            "rating": ratings.get(b.id, (0.0, 0))[0],
-            "review_count": ratings.get(b.id, (0.0, 0))[1],
-        })
-
+    books = [
+        {**book_dict(b, *ratings.get(b.id, (0.0, 0))), "viewed_at": viewed_at}
+        for b, viewed_at in rows
+        if _matches(b, q)
+    ]
     return render_template("history.html", books=books, q=q)
 
 
 @bp.post("/api/history/add")
 @login_required
 def api_history_add():
-    data = request.get_json(silent=True) or {}
-    book_id = int(data.get("book_id") or 0)
-    if not book_id:
-        return jsonify({"ok": False, "error": "missing book_id"}), 400
+    book = _book_from_json()
+    if book is None:
+        return jsonify({"ok": False, "error": "That book doesn't exist."}), 404
 
-    row = History.query.filter_by(user_id=current_user.id, book_id=book_id).first()
+    row = History.query.filter_by(user_id=current_user.id, book_id=book.id).first()
     if row:
-        row.viewed_at = datetime.utcnow()
+        row.viewed_at = utc_now()
     else:
-        db.session.add(History(user_id=current_user.id, book_id=book_id))
-
+        db.session.add(History(user_id=current_user.id, book_id=book.id))
     db.session.commit()
     return jsonify({"ok": True})

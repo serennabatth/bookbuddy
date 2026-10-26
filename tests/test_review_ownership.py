@@ -22,7 +22,8 @@ def make_user(email):
 @pytest.fixture
 def setup(app):
     """Two readers, one book, and a review written by the author."""
-    author, stranger = make_user("author@example.com"), make_user("stranger@example.com")
+    author = make_user("author@example.com")
+    make_user("stranger@example.com")
     book = Book(title="Dracula", author="Bram Stoker")
     db.session.add(book)
     db.session.commit()

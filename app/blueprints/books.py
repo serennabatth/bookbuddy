@@ -6,7 +6,7 @@ from flask_login import current_user, login_required
 from sqlalchemy import func
 
 from app.extensions import db
-from app.models import Book, Review
+from app.models import Book, Review, utc_now
 from app.services import openlibrary
 from app.services.catalogue import (
     GENRES, PLACEHOLDER_COVER, SORT_OPTIONS,
@@ -25,11 +25,11 @@ def _page_number() -> int:
         return 1
 
 
-def _time_ago(dt: datetime) -> str:
+def _time_ago(dt: datetime | None) -> str:
     """e.g. "3h ago", "2d ago"."""
     if not dt:
         return ""
-    now = datetime.utcnow()
+    now = utc_now()
     diff = now - dt
     seconds = int(diff.total_seconds())
 

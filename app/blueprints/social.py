@@ -26,7 +26,7 @@ def current_user_handle() -> str:
     return ""
 
 
-def _people(users, q: str) -> list[dict]:
+def _people(users: list[User], q: str | None) -> list[dict]:
     """Format users for the followers/following pages, with optional search."""
     q = (q or "").strip().lower()
     people = []
@@ -64,7 +64,7 @@ def followers():
     return render_template("followers.html", people=_people(users, request.args.get("q")))
 
 
-def _target_user_from_json():
+def _target_user_from_json() -> User | None:
     """Get the user from {"user_id": ...} in the request body, or None."""
     data = request.get_json(silent=True) or {}
     try:

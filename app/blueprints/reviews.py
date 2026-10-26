@@ -9,7 +9,7 @@ from app.services.catalogue import book_dict
 bp = Blueprint("reviews", __name__)
 
 
-def _parse_rating(raw) -> int | None:
+def _parse_rating(raw: str | None) -> int | None:
     """Rating as an int from 1-5, or None if it's invalid."""
     try:
         rating = int(raw)
