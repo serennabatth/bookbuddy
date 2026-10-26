@@ -1,5 +1,17 @@
+# Python
 venv/
-__pycache__
+__pycache__/
 *.pyc
+
+# Secrets and local settings
 .env
+
+# Local database and anything users upload
 instance/
+*.db
+static/uploads/
+
+# Test and coverage output
+.pytest_cache/
+.coverage
+htmlcov/

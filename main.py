@@ -8,10 +8,13 @@ from flask_login import (
     current_user, logout_user
 )
 from werkzeug.security import generate_password_hash, check_password_hash
+from dotenv import load_dotenv
+from flask_migrate import Migrate
 from io import BytesIO
 import qrcode
 import qrcode.image.pil  # ensure PIL backend available
 import os
+import secrets
 from datetime import datetime
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from sqlalchemy import text, func
@@ -23,13 +26,49 @@ import json
 # -----------------------------------------------------------------------------
 # App & DB
 # -----------------------------------------------------------------------------
+# Read settings from a .env file in the project folder, if there is one.
+# Real environment variables always win over values in .env.
+load_dotenv()
+
 app = Flask(__name__)
-app.config["SECRET_KEY"] = os.environ.get("BOOKBUDDY_SECRET", "dev-change-me")
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + os.path.join(app.instance_path, "bookbuddy.db")
+
+# "development" (default), "testing" or "production"
+APP_ENV = os.environ.get("BOOKBUDDY_ENV", "development").strip().lower()
+IS_PRODUCTION = APP_ENV == "production"
+
+
+def _load_secret_key() -> str:
+    """Return the key Flask uses to sign session cookies and reset tokens.
+
+    Anyone who knows this key can forge a login cookie, so it must never be
+    a fixed value in the code. In production the app refuses to start
+    without one.
+    """
+    key = (os.environ.get("SECRET_KEY") or os.environ.get("BOOKBUDDY_SECRET") or "").strip()
+    if key:
+        return key
+    if IS_PRODUCTION:
+        raise RuntimeError("SECRET_KEY must be set when BOOKBUDDY_ENV=production.")
+    app.logger.warning(
+        "SECRET_KEY is not set, so a temporary random key is being used and "
+        "everyone is logged out when the server restarts. Set SECRET_KEY in .env."
+    )
+    return secrets.token_hex(32)
+
+
+app.config["SECRET_KEY"] = _load_secret_key()
+
 os.makedirs(app.instance_path, exist_ok=True)
+app.config["SQLALCHEMY_DATABASE_URI"] = (
+    os.environ.get("DATABASE_URL")
+    or "sqlite:///" + os.path.join(app.instance_path, "bookbuddy.db")
+)
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)
+# render_as_batch lets Alembic change columns on SQLite, which can't ALTER
+# most things in place: it copies the table, changes it and swaps it back.
+migrate = Migrate(app, db, render_as_batch=True)
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
 
@@ -109,24 +148,9 @@ def load_user(user_id):
     return User.query.get(int(user_id))
 
 
-with app.app_context():
-    db.create_all()
-
-    # add bio column  (sqlite dev migration)
-    cols_user = [row[1] for row in db.session.execute(text("PRAGMA table_info(user)")).fetchall()]
-    if "bio" not in cols_user:
-        db.session.execute(text("ALTER TABLE user ADD COLUMN bio TEXT DEFAULT ''"))
-        db.session.commit()
-
-    # add Open Library columns to book if they don't exist yet (sqlite dev migration)
-    cols_book = [row[1] for row in db.session.execute(text("PRAGMA table_info(book)")).fetchall()]
-    if "olid" not in cols_book:
-        db.session.execute(text("ALTER TABLE book ADD COLUMN olid TEXT DEFAULT ''"))
-    if "cover_i" not in cols_book:
-        db.session.execute(text("ALTER TABLE book ADD COLUMN cover_i TEXT DEFAULT ''"))
-    if "isbn" not in cols_book:
-        db.session.execute(text("ALTER TABLE book ADD COLUMN isbn TEXT DEFAULT ''"))
-    db.session.commit()
+# The database schema is now managed by Flask-Migrate (Alembic).
+# Create or update tables with:   flask --app main db upgrade
+# After changing a model, record it: flask --app main db migrate -m "what changed"
 
 
 # -----------------------------------------------------------------------------
@@ -639,9 +663,16 @@ def _ensure_seeded_curated(min_books: int = 250):
 
 
 
-with app.app_context():
-    # Auto-seed so the app feels real without manual adding
+@app.cli.command("seed")
+def seed_command() -> None:
+    """Add the curated starter books. Needs an internet connection.
+
+    This used to run every time main.py was imported, which made start-up
+    wait on Open Library and broke `flask db` commands on an empty database.
+    Run it once with:  flask --app main seed
+    """
     _ensure_seeded_curated(min_books=250)
+    print(f"The catalogue now has {Book.query.count()} books.")
 
 
 # -----------------------------------------------------------------------------
@@ -714,11 +745,11 @@ def book_details(title):
     )
     avg_rating = float(avg or 0.0)
 
-    # Update the book dict rating so your template shows the real avg
+    # Update the book dict rating so  template shows the real avg
     book = dict(book)  
     book["rating"] = avg_rating
 
-    # Convert Review rows into the dict shape your template expects
+    # Convert Review rows into the dict shape the template expects
     reviews_for_template = []
     for r in real_reviews:
         # prefer handle if available, else name, else email prefix
@@ -1476,5 +1507,7 @@ def inject_globals():
 # Run
 # -----------------------------------------------------------------------------
 if __name__ == "__main__":
-    print(">>> http://127.0.0.1:5000")
-    app.run(debug=True)
+    # Debug mode shows an interactive console in the browser when an error
+    # happens, so it is only switched on when FLASK_DEBUG=1 is set locally.
+    # The usual way to run locally is:  flask --app main run --debug
+    app.run(debug=os.environ.get("FLASK_DEBUG") == "1")
