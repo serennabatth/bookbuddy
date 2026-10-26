@@ -311,6 +311,7 @@
 <script>
   const BOOKS = JSON.parse(document.getElementById('book-data').textContent) || [];
   const PLACEHOLDER = "https://placehold.co/400x600/EEE/AAA?text=No+Cover";
+  const CHEVRON_SVG = '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>';
 
   const input = document.getElementById('searchInput');
 
@@ -354,14 +355,6 @@
     });
   });
 
-  function escapeHtml(s) {
-    return String(s || '')
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;')
-      .replaceAll("'", '&#039;');
-  }
 
   function openDropdown(){
     dropdown.classList.add('open');
@@ -411,16 +404,30 @@
 
       const cover = (b.cover || '').trim() || PLACEHOLDER;
 
-      row.innerHTML = `
-        <div class="thumb"><img src="${cover}" alt="" onerror="this.src='${PLACEHOLDER}'"></div>
-        <div class="meta">
-          <div class="title">${escapeHtml(b.title || '')}</div>
-          <div class="sub">${escapeHtml(b.author || '')}</div>
-        </div>
-        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-          <polyline points="9 18 15 12 9 6"></polyline>
-        </svg>
-      `;
+      // Build the row from elements instead of an HTML string. textContent
+      // and img.src treat book data as plain text, so a title or cover link
+      // can never be run as code (this closes an XSS hole).
+      const thumb = document.createElement('div');
+      thumb.className = 'thumb';
+      const img = document.createElement('img');
+      img.src = cover;
+      img.alt = '';
+      img.addEventListener('error', () => { img.src = PLACEHOLDER; }, { once: true });
+      thumb.appendChild(img);
+
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      const titleEl = document.createElement('div');
+      titleEl.className = 'title';
+      titleEl.textContent = b.title || '';
+      const subEl = document.createElement('div');
+      subEl.className = 'sub';
+      subEl.textContent = b.author || '';
+      meta.append(titleEl, subEl);
+
+      row.append(thumb, meta);
+      // The chevron icon is fixed markup with no book data in it, so inserting it as HTML is safe.
+      row.insertAdjacentHTML('beforeend', CHEVRON_SVG);
 
       row.addEventListener('click', () => selectBook(b));
       row.addEventListener('keydown', (e) => { if (e.key === 'Enter') selectBook(b); });

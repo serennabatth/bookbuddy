@@ -19,9 +19,10 @@ import secrets
 from datetime import datetime
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from sqlalchemy import text, func
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 from urllib.request import urlopen, Request
 import json
+from functools import lru_cache
 
 
 # -----------------------------------------------------------------------------
@@ -246,7 +247,22 @@ def verify_reset_token(token: str, max_age_seconds: int = 3600):
 
 
 PLACEHOLDER_COVER = "https://placehold.co/400x600/EEE/AAA?text=No+Cover"
-_DEMO_COVER_CACHE: dict[tuple[str, str], dict] = {}  # (title, author) -> {cover, cover_i, isbn, olid}
+
+
+def safe_cover_url(url: str) -> str:
+    """Return the URL only if it is a plain https:// web address, else "".
+
+    Cover links can come from users, so anything else (javascript:, data:,
+    text with quotes or angle brackets) is thrown away before it is saved
+    or shown.
+    """
+    url = (url or "").strip()
+    if not url or any(ch in url for ch in "\"'<> "):
+        return ""
+    parsed = urlparse(url)
+    if parsed.scheme != "https" or not parsed.netloc:
+        return ""
+    return url
 
 
 def _ol_cover_url(cover_i: str = "", isbn: str = "", olid: str = "") -> str:
@@ -354,22 +370,15 @@ def all_books_ui():
     Returns list of dicts for templates/JS: demo BOOKS + DB Book rows.
     Also adds computed avg rating from Review rows (by title match).
 
-    Cover accuracy improvements:
-      - DB books: prefer stored cover_i/isbn/olid to build cover URLs
-      - Demo books: one-time Open Library lookup & cache
+    Performance (stopgap until Phase 3 task 5):
+      - no Open Library calls here: demo books use their stored cover link
+      - all average ratings come from ONE grouped query, not one per book
     """
     demo = []
     for b in BOOKS:
         title = b.get("title", "")
         author = b.get("author", "")
-        key = (title, author)
-        cover = b.get("cover") or ""
-
-        if key not in _DEMO_COVER_CACHE:
-            meta = _ol_best_match(title, author) or {}
-            _DEMO_COVER_CACHE[key] = meta if meta.get("cover") else {"cover": cover}
-
-        best_cover = (_DEMO_COVER_CACHE.get(key) or {}).get("cover") or cover
+        best_cover = safe_cover_url(b.get("cover"))
 
         demo.append({
             "title": title,
@@ -380,21 +389,24 @@ def all_books_ui():
             "rating": float(b.get("rating", 0.0) or 0.0),
         })
 
+    # {book title: average rating} for every reviewed book, in one query.
+    avg_by_title = dict(
+        db.session.query(Review.book_title, func.avg(Review.rating))
+        .group_by(Review.book_title)
+        .all()
+    )
+
     db_books = Book.query.all()
     db_list = []
     for bk in db_books:
-        avg = (
-            db.session.query(func.avg(Review.rating))
-            .filter(Review.book_title == bk.title)
-            .scalar()
-        )
+        avg = avg_by_title.get(bk.title)
 
         built = _ol_cover_url(
             cover_i=str(getattr(bk, "cover_i", "") or ""),
             isbn=str(getattr(bk, "isbn", "") or ""),
             olid=str(getattr(bk, "olid", "") or ""),
         )
-        final_cover = built or (bk.cover or "") or PLACEHOLDER_COVER
+        final_cover = built or safe_cover_url(bk.cover) or PLACEHOLDER_COVER
 
         db_list.append({
             "title": bk.title,
@@ -436,7 +448,8 @@ def _time_ago(dt: datetime) -> str:
     return f"{years}y ago"
 
 
-def _ol_description_for(title: str, author: str = "", timeout: int = 10) -> str:
+@lru_cache(maxsize=1024)
+def _ol_description_for(title: str, author: str = "", timeout: int = 4) -> str:
     """
     Best-effort description from Open Library.
     Uses search -> first work -> work details.
@@ -893,13 +906,14 @@ def add_review():
 
 
 @app.route("/add-book", methods=["GET", "POST"])
+@login_required
 def add_book():
     if request.method == "POST":
         title = (request.form.get("title") or "").strip()
         author = (request.form.get("author") or "").strip()
         genre = (request.form.get("genre") or "").strip() or "Other"
         year = (request.form.get("year") or "").strip()
-        cover = (request.form.get("cover") or "").strip()
+        cover = safe_cover_url(request.form.get("cover"))
 
         if not title or not author:
             flash("Title and author are required.", "error")
@@ -911,7 +925,7 @@ def add_book():
             return redirect(url_for("add_review"))
 
         meta = _ol_best_match(title, author) or {}
-        best_cover = meta.get("cover") or cover or PLACEHOLDER_COVER
+        best_cover = safe_cover_url(meta.get("cover")) or cover or PLACEHOLDER_COVER
 
         b = Book(
             title=title,
