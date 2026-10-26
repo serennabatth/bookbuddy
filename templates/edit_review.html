@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% from "_cover.html" import book_cover %}
+
+{% block title %}Edit your review · BookBuddy{% endblock %}
+
+{% block appbar %}
+  <a class="navicon" href="{{ url_for('book_details', book_id=book.id) }}" aria-label="Back to {{ book.title }}">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+      <polyline points="15 18 9 12 15 6"></polyline>
+    </svg>
+  </a>
+  <h1 class="h1">Edit your review</h1>
+{% endblock %}
+
+{% block content %}
+<style>
+  .er-wrap { padding:16px 16px 112px; display:flex; flex-direction:column; gap:24px; }
+  .er-book { display:flex; gap:16px; align-items:center; }
+  .er-book .book-cover { width:56px; flex:none; }
+  .er-book .t { font-weight:600; }
+  .er-book .a { font-size:14px; color:var(--text-2); }
+  .er-stars { border:0; margin:0; padding:0; display:flex; flex-direction:row-reverse; justify-content:flex-end; gap:4px; }
+  .er-stars legend { font-weight:600; margin-bottom:8px; width:100%; }
+  /* Real radio buttons, visually replaced by stars; keyboard arrows move between them. */
+  .er-stars input { position:absolute; opacity:0; width:1px; height:1px; }
+  .er-stars label { font-size:34px; line-height:1; color:#CFC5B6; cursor:pointer; padding:2px; }
+  .er-stars input:checked ~ label,
+  .er-stars label:hover, .er-stars label:hover ~ label { color:#8A2D24; }
+  .er-stars input:focus-visible + label { outline:2px solid #8A2D24; outline-offset:2px; border-radius:4px; }
+  .er-text label { display:block; font-weight:600; margin-bottom:8px; }
+  .er-text textarea { width:100%; min-height:160px; padding:12px; border-radius:12px; font:inherit; resize:vertical; box-sizing:border-box; }
+  .er-actions { display:flex; flex-direction:column; gap:8px; }
+</style>
+
+<form class="er-wrap" method="post" action="{{ url_for('edit_review', review_id=review.id) }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  <div class="er-book">
+    {{ book_cover(book, "sm") }}
+    <div>
+      <div class="t">{{ book.title }}</div>
+      <div class="a">{{ book.author }}</div>
+    </div>
+  </div>
+
+  {# Stars are listed 5 to 1 and shown right-to-left, so "this star and the ones before it" light up in CSS. #}
+  <fieldset class="er-stars">
+    <legend>Your rating</legend>
+    {% for n in [5, 4, 3, 2, 1] %}
+      <input type="radio" id="star{{ n }}" name="rating" value="{{ n }}" {% if review.rating == n %}checked{% endif %} required>
+      <label for="star{{ n }}" title="{{ n }} star{{ '' if n == 1 else 's' }}">★<span class="visually-hidden" style="position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0);">{{ n }} star{{ '' if n == 1 else 's' }}</span></label>
+    {% endfor %}
+  </fieldset>
+
+  <div class="er-text">
+    <label for="review-text">Your review</label>
+    <textarea id="review-text" name="review" maxlength="2000" required>{{ review.text }}</textarea>
+  </div>
+
+  <div class="er-actions">
+    <button type="submit" class="button primary">Save changes</button>
+    <a class="button" href="{{ url_for('book_details', book_id=book.id) }}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

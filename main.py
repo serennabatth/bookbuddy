@@ -13,6 +13,7 @@ from flask_migrate import Migrate
 from flask_wtf.csrf import CSRFProtect, CSRFError
 from io import BytesIO
 import qrcode
+from PIL import Image, UnidentifiedImageError
 import qrcode.image.pil  # ensure PIL backend available
 import os
 import re
@@ -71,6 +72,8 @@ app.config["SQLALCHEMY_DATABASE_URI"] = (
     or "sqlite:///" + os.path.join(app.instance_path, "bookbuddy.db")
 )
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+# Reject any request bigger than 2 MB (Flask answers 413 before reading it all).
+app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024
 
 db = SQLAlchemy(app)
 # render_as_batch lets Alembic change columns on SQLite, which can't ALTER
@@ -836,15 +839,21 @@ def book_details(book_id):
         .limit(25)
         .all()
     )
+    viewer_id = current_user.id if current_user.is_authenticated else None
     reviews_for_template = [
         {
+            "id": r.id,
             "user": _display_name(r.user),
             "rating": r.rating,
             "text": (r.text or "").strip(),
             "age": _time_ago(r.created),
+            "is_mine": r.user_id == viewer_id,
         }
         for r in latest_reviews
     ]
+    my_review = (
+        Review.query.filter_by(user_id=viewer_id, book_id=bk.id).first() if viewer_id else None
+    )
 
     # Fetched from Open Library once, then kept in the database.
     # Shown only when Open Library has one (the old made-up fallback text is gone).
@@ -861,6 +870,7 @@ def book_details(book_id):
         book_id=bk.id,
         description=description,
         reviews=reviews_for_template,
+        my_review_id=my_review.id if my_review else None,
     )
 
 
@@ -933,6 +943,47 @@ def add_review():
         return redirect(url_for("book_details", book_id=bk.id))
 
     return render_template("add_review.html")
+
+
+def _own_review_or_403(review_id: int) -> Review:
+    """The review, but only if the logged-in user wrote it.
+
+    Checking ownership on the server matters: hiding the Edit button isn't
+    enough, because anyone can send a request with a different review id.
+    """
+    review = db.get_or_404(Review, review_id)
+    if review.user_id != current_user.id:
+        abort(403)
+    return review
+
+
+@app.route("/reviews/<int:review_id>/edit", methods=["GET", "POST"])
+@login_required
+def edit_review(review_id):
+    review = _own_review_or_403(review_id)
+    if request.method == "POST":
+        rating = _parse_rating(request.form.get("rating"))
+        text = (request.form.get("review") or "").strip()
+        if rating is None or not text:
+            flash("Choose a rating from 1 to 5 stars and write something.", "error")
+            return redirect(url_for("edit_review", review_id=review.id))
+        review.rating = rating
+        review.text = text
+        db.session.commit()
+        flash("Review updated.", "ok")
+        return redirect(url_for("book_details", book_id=review.book_id))
+    return render_template("edit_review.html", review=review, book=_book_dict(review.book, 0.0))
+
+
+@app.post("/reviews/<int:review_id>/delete")
+@login_required
+def delete_review(review_id):
+    review = _own_review_or_403(review_id)
+    book_id = review.book_id
+    db.session.delete(review)
+    db.session.commit()
+    flash("Review deleted.", "ok")
+    return redirect(url_for("book_details", book_id=book_id))
 
 
 @app.route("/add-book", methods=["GET", "POST"])
@@ -1302,8 +1353,50 @@ def my_reviews():
     return render_template("my_reviews.html", reviews=reviews)
 
 
-from werkzeug.utils import secure_filename
-import os
+
+AVATAR_FOLDER = os.path.join("uploads", "avatars")   # inside static/
+AVATAR_MAX_SIZE = (512, 512)
+Image.MAX_IMAGE_PIXELS = 25_000_000   # refuse "decompression bombs": tiny files that expand to huge images
+
+
+def save_avatar(file, user_id: int) -> str | None:
+    """Check an uploaded picture and save a clean copy. Returns its path inside static/, or None.
+
+    - Pillow must be able to open it as an image (the file name proves nothing).
+    - It's shrunk to at most 512x512 and re-saved as a fresh JPEG, which also
+      drops hidden metadata such as the GPS location a phone camera adds.
+    - The name is random, so nobody can guess or overwrite someone else's file.
+    """
+    try:
+        with Image.open(file.stream) as img:
+            img.load()
+            img = img.convert("RGB")
+            img.thumbnail(AVATAR_MAX_SIZE)
+            filename = f"user_{user_id}_{secrets.token_hex(8)}.jpg"
+            folder = os.path.join(app.static_folder, AVATAR_FOLDER)
+            os.makedirs(folder, exist_ok=True)
+            img.save(os.path.join(folder, filename), "JPEG", quality=85)
+    except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError):
+        return None
+    return f"{AVATAR_FOLDER.replace(os.sep, '/')}/{filename}"
+
+
+def _delete_avatar_file(path: str | None) -> None:
+    """Remove an old profile picture, but only if it really is one of ours."""
+    if not path or not path.startswith("uploads/avatars/"):
+        return
+    full = os.path.join(app.static_folder, *path.split("/"))
+    try:
+        os.remove(full)
+    except FileNotFoundError:
+        pass
+
+
+@app.errorhandler(413)
+def file_too_large(error):
+    flash("That picture is too big. Please choose one under 2 MB.", "error")
+    return redirect(url_for("edit_profile"))
+
 
 @app.route("/edit-profile", methods=["GET", "POST"])
 @login_required
@@ -1334,29 +1427,14 @@ def edit_profile():
         # ----------------------------
         # Profile picture upload
         # ----------------------------
-        file = request.files.get("avatar")  
-
+        file = request.files.get("avatar")
         if file and file.filename:
-            filename = secure_filename(file.filename)
-
-            
-            allowed_ext = {"png", "jpg", "jpeg", "webp"}
-            ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
-            if ext in allowed_ext:
-                # app.static_folder is the project's static/ folder wherever the
-                # app is started from (the old relative path depended on that).
-                upload_folder = os.path.join(app.static_folder, "uploads", "avatars")
-                os.makedirs(upload_folder, exist_ok=True)
-
-                
-                base = filename.rsplit(".", 1)[0]
-                filename = f"user_{current_user.id}_{base}.{ext}"
-
-                filepath = os.path.join(upload_folder, filename)
-                file.save(filepath)
-
-                # Store path relative to /static because you do url_for('static', filename=user.avatar)
-                current_user.avatar = f"uploads/avatars/{filename}"
+            new_path = save_avatar(file, current_user.id)
+            if new_path is None:
+                flash("That file isn't a picture we can use. Try a JPG, PNG or WebP image.", "error")
+                return redirect(url_for("edit_profile"))
+            _delete_avatar_file(current_user.avatar)
+            current_user.avatar = new_path
 
         db.session.commit()
         flash("Profile updated.", "ok")
