@@ -18,8 +18,11 @@ import qrcode.image.pil  # ensure PIL backend available
 import os
 import re
 import secrets
+import threading
+import time
+from collections import defaultdict, deque
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from sqlalchemy import event, func, or_
 from sqlalchemy.engine import Engine
@@ -72,6 +75,19 @@ app.config["SQLALCHEMY_DATABASE_URI"] = (
     or "sqlite:///" + os.path.join(app.instance_path, "bookbuddy.db")
 )
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+# Cookies: never readable by JavaScript, not sent on cross-site requests, and
+# (in production, where the site is HTTPS) only ever sent over HTTPS.
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=IS_PRODUCTION,
+    REMEMBER_COOKIE_HTTPONLY=True,
+    REMEMBER_COOKIE_SAMESITE="Lax",
+    REMEMBER_COOKIE_SECURE=IS_PRODUCTION,
+    REMEMBER_COOKIE_DURATION=timedelta(days=30),
+    RATE_LIMITS_ENABLED=(APP_ENV != "testing"),
+)
+
 # Reject any request bigger than 2 MB (Flask answers 413 before reading it all).
 app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024
 
@@ -128,6 +144,8 @@ class User(UserMixin, db.Model):
     bio = db.Column(db.Text, default="")
     # Path inside /static, e.g. "uploads/avatars/user_4_photo.jpg", or "" for none.
     avatar = db.Column(db.String(255), default="")
+    # Private profiles hide their reviews and lists from everyone else.
+    is_private = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
 
     # A unique index (not a constraint) so SQLite can add it without rebuilding the table.
     __table_args__ = (db.Index("uq_user_handle", "handle", unique=True),)
@@ -251,20 +269,6 @@ GENRES = [
     "Sci-Fi", "Classics", "Dystopian", "Gothic", "Literary", "Adventure"
 ]
 
-# ----------------------------
-# App/session preferences demo
-# ----------------------------
-LANGS = ["English", "Español", "Français", "Deutsch", "Italiano"]
-
-
-def get_pref(key, default=None):
-    return session.get(key, default)
-
-
-def set_pref(key, value):
-    session[key] = value
-
-
 # -----------------------------------------------------------------------------
 # Helpers
 # -----------------------------------------------------------------------------
@@ -304,19 +308,96 @@ def current_user_handle() -> str:
     return ""
 
 
+PASSWORD_MIN_LENGTH = 8
+
+
+def password_problem(password: str) -> str | None:
+    """What's wrong with a new password, or None if it's fine.
+
+    Length matters far more than forced symbols (this follows current UK NCSC
+    and US NIST advice), so the rule is simply 8 to 128 characters.
+    """
+    if len(password or "") < PASSWORD_MIN_LENGTH:
+        return f"Passwords must be at least {PASSWORD_MIN_LENGTH} characters."
+    if len(password) > 128:
+        return "Passwords can be at most 128 characters."
+    return None
+
+
 def _reset_serializer():
     return URLSafeTimedSerializer(app.config["SECRET_KEY"], salt="password-reset")
 
 
-def generate_reset_token(email: str) -> str:
-    return _reset_serializer().dumps(email)
+def generate_reset_token(user) -> str:
+    """A signed link token for resetting this user's password.
+
+    It includes a fingerprint of the current password hash. As soon as the
+    password changes, the fingerprint stops matching, so each link works once.
+    """
+    return _reset_serializer().dumps({"email": user.email, "pw": user.password_hash[-16:]})
 
 
 def verify_reset_token(token: str, max_age_seconds: int = 3600):
+    """The user a reset token belongs to, or None if it's invalid, expired or already used."""
     try:
-        return _reset_serializer().loads(token, max_age=max_age_seconds)
+        data = _reset_serializer().loads(token, max_age=max_age_seconds)
     except (SignatureExpired, BadSignature):
         return None
+    if not isinstance(data, dict):
+        return None   # an old-style link from before tokens were single-use
+    user = User.query.filter_by(email=data.get("email")).first()
+    if user is None or user.password_hash[-16:] != data.get("pw"):
+        return None
+    return user
+
+
+class RateLimiter:
+    """Allows at most `limit` attempts per `window` seconds for each key (e.g. one IP address).
+
+    It remembers the time of each recent attempt and forgets ones older than
+    the window ("sliding window"). Kept in memory, so it resets when the
+    server restarts; a large site would keep these counts in Redis instead.
+    """
+
+    def __init__(self) -> None:
+        self._attempts: dict[str, deque] = defaultdict(deque)
+        self._lock = threading.Lock()
+
+    def allow(self, key: str, limit: int, window: float) -> bool:
+        now = time.monotonic()
+        with self._lock:
+            attempts = self._attempts[key]
+            while attempts and now - attempts[0] > window:
+                attempts.popleft()
+            if len(attempts) >= limit:
+                return False
+            attempts.append(now)
+            return True
+
+    def reset(self) -> None:
+        with self._lock:
+            self._attempts.clear()
+
+
+rate_limiter = RateLimiter()
+
+
+def rate_limited(action: str, limit: int, window: float) -> bool:
+    """True if this visitor has tried `action` too often recently."""
+    if not app.config.get("RATE_LIMITS_ENABLED", True):
+        return False
+    return not rate_limiter.allow(f"{action}:{request.remote_addr}", limit, window)
+
+
+def safe_next_url(target: str | None) -> str | None:
+    """Only allow redirects to pages on this site after login.
+
+    Without this check, a link like /login?next=https://evil.example could
+    send someone to a fake site straight after they log in ("open redirect").
+    """
+    if not target or not target.startswith("/") or target.startswith("//") or "\\" in target:
+        return None
+    return target
 
 
 PLACEHOLDER_COVER = "https://placehold.co/400x600/EEE/AAA?text=No+Cover"
@@ -793,6 +874,8 @@ def _display_name(user) -> str:
     """How a reviewer is shown: their handle, else their name, else "reader"."""
     if not user:
         return "reader"
+    if user.is_private:
+        return "A reader"   # private profiles aren't named on book pages
     return (user.handle or user.name or "").strip() or "reader"
 
 
@@ -1488,8 +1571,11 @@ def public_profile(handle):
     )
     followers_count, following_count = follow_counts(owner.id)
     is_own = current_user.is_authenticated and current_user.id == owner.id
+    hidden = owner.is_private and not is_own
+    if hidden:
+        reviews = []
     return render_template(
-        "profile.html", user=user, your_reviews=reviews,
+        "profile.html", user=user, your_reviews=reviews, is_private_view=hidden,
         profile_id=owner.id, is_own=is_own,
         is_following=current_user.is_authenticated and not is_own and is_following(current_user.id, owner.id),
         review_count=Review.query.filter_by(user_id=owner.id).count(),
@@ -1517,8 +1603,8 @@ def change_password():
         if not current_user.check_password(current):
             flash("Current password is incorrect.", "error")
             return redirect(url_for("change_password"))
-        if not new or len(new) < 6:
-            flash("New password must be at least 6 characters.", "error")
+        if password_problem(new):
+            flash(password_problem(new), "error")
             return redirect(url_for("change_password"))
         if new != confirm:
             flash("Passwords do not match.", "error")
@@ -1532,63 +1618,14 @@ def change_password():
 
 
 @app.route("/privacy", methods=["GET", "POST"])
+@login_required
 def privacy_settings():
     if request.method == "POST":
-        profile_private = bool(request.form.get("profile_private"))
-        show_activity = bool(request.form.get("show_activity"))
-        set_pref("profile_private", profile_private)
-        set_pref("show_activity", show_activity)
+        current_user.is_private = bool(request.form.get("profile_private"))
+        db.session.commit()
         flash("Privacy settings saved.", "ok")
         return redirect(url_for("privacy_settings"))
-    return render_template(
-        "privacy_settings.html",
-        profile_private=get_pref("profile_private", False),
-        show_activity=get_pref("show_activity", True),
-    )
-
-
-@app.route("/notifications", methods=["GET", "POST"])
-def notifications_settings():
-    if request.method == "POST":
-        enabled = bool(request.form.get("enabled"))
-        set_pref("notifications_enabled", enabled)
-        flash("Notifications preference updated.", "ok")
-        return redirect(url_for("notifications_settings"))
-    return render_template(
-        "notification_settings.html",
-        enabled=get_pref("notifications_enabled", True),
-    )
-
-
-@app.route("/theme", methods=["GET", "POST"])
-def theme_settings():
-    if request.method == "POST":
-        theme = (request.form.get("theme") or "light").lower()
-        if theme not in ("light", "dark"):
-            theme = "light"
-        set_pref("theme", theme)
-        flash("Theme updated.", "ok")
-        return redirect(url_for("theme_settings"))
-    return render_template(
-        "theme_settings.html",
-        theme=get_pref("theme", "light"),
-    )
-
-
-@app.route("/language", methods=["GET", "POST"])
-def language_settings():
-    if request.method == "POST":
-        lang = request.form.get("lang") or "English"
-        if lang not in LANGS:
-            lang = "English"
-        set_pref("lang", lang)
-        flash("Language set to {}".format(lang), "ok")
-        return redirect(url_for("language_settings"))
-    return render_template(
-        "language_settings.html",
-        langs=LANGS,
-        current=get_pref("lang", "English"),
-    )
+    return render_template("privacy_settings.html", profile_private=current_user.is_private)
 
 
 # -----------------------------------------------------------------------------
@@ -1619,6 +1656,9 @@ def signup():
         if not email or not password:
             flash("Email and password are required.", "error")
             return redirect(url_for("signup"))
+        if password_problem(password):
+            flash(password_problem(password), "error")
+            return redirect(url_for("signup"))
         if handle_raw and handle is None:
             flash(HANDLE_RULES, "error")
             return redirect(url_for("signup"))
@@ -1634,7 +1674,7 @@ def signup():
         user.set_password(password)
         db.session.add(user)
         db.session.commit()
-        login_user(user, remember=True)
+        login_user(user)
         return redirect(url_for("home"))
 
     return render_template("sign_up.html")
@@ -1643,14 +1683,20 @@ def signup():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
+        if rate_limited("login", limit=5, window=60):
+            flash("Too many sign-in attempts. Please wait a minute and try again.", "error")
+            return render_template("sign_in.html"), 429
+
         email = (request.form.get("email") or "").strip().lower()
         password = (request.form.get("password") or "")
         user = User.query.filter_by(email=email).first()
         if not user or not user.check_password(password):
             flash("Invalid email or password.", "error")
-            return redirect(url_for("login"))
-        login_user(user, remember=True)
-        return redirect(url_for("home"))
+            return redirect(url_for("login", next=request.args.get("next")))
+
+        # Stay signed in for 30 days only if the reader ticked "Remember me".
+        login_user(user, remember=bool(request.form.get("remember")))
+        return redirect(safe_next_url(request.args.get("next")) or url_for("home"))
     return render_template("sign_in.html")
 
 
@@ -1663,17 +1709,20 @@ def logout():
 @app.route("/forgot-password", methods=["GET", "POST"])
 def forgot_password():
     if request.method == "POST":
+        if rate_limited("forgot-password", limit=3, window=600):
+            flash("Too many reset requests. Please try again in a few minutes.", "error")
+            return render_template("forgot_password.html"), 429
+
         email = (request.form.get("email") or "").strip().lower()
 
         user = User.query.filter_by(email=email).first()
         if user:
-            token = generate_reset_token(user.email)
+            token = generate_reset_token(user)
             reset_link = url_for("reset_password", token=token, _external=True)
 
             
-            print("\n=== PASSWORD RESET LINK ===")
-            print(reset_link)
-            print("===========================\n")
+            # Development only: email isn't set up yet, so the link goes to the log.
+            app.logger.warning("PASSWORD RESET LINK for %s: %s", user.email, reset_link)
 
         flash("If that email exists, you’ll receive a password reset link shortly.", "ok")
         return redirect(url_for("login"))
@@ -1683,22 +1732,17 @@ def forgot_password():
 
 @app.route("/reset-password/<token>", methods=["GET", "POST"])
 def reset_password(token):
-    email = verify_reset_token(token, max_age_seconds=60 * 60)
-    if not email:
-        flash("That reset link is invalid or has expired. Please try again.", "error")
-        return redirect(url_for("forgot_password"))
-
-    user = User.query.filter_by(email=email).first()
-    if not user:
-        flash("That reset link is invalid or has expired. Please try again.", "error")
+    user = verify_reset_token(token, max_age_seconds=60 * 60)
+    if user is None:
+        flash("That reset link is invalid, expired or already used. Please request a new one.", "error")
         return redirect(url_for("forgot_password"))
 
     if request.method == "POST":
-        new_pw = (request.form.get("new_password") or "").strip()
-        confirm = (request.form.get("confirm_password") or "").strip()
+        new_pw = request.form.get("new_password") or ""
+        confirm = request.form.get("confirm_password") or ""
 
-        if not new_pw or len(new_pw) < 6:
-            flash("Password must be at least 6 characters.", "error")
+        if password_problem(new_pw):
+            flash(password_problem(new_pw), "error")
             return redirect(url_for("reset_password", token=token))
         if new_pw != confirm:
             flash("Passwords do not match.", "error")

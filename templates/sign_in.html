@@ -148,7 +148,7 @@
   <div class="brand">BookBuddy</div>
   <div class="title">Login</div>
 
-  <form method="POST" action="{{ url_for('login') }}">
+  <form method="POST" action="{{ url_for('login', next=request.args.get('next')) }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="field">
       <label class="label" for="email">Email</label>
@@ -159,6 +159,11 @@
       <label class="label" for="password">Password</label>
       <input id="password" name="password" class="input" type="password" autocomplete="current-password" required>
     </div>
+
+    <label style="display:flex; align-items:center; gap:8px; margin:4px 0 12px; font-size:14px;">
+      <input type="checkbox" name="remember" value="1" style="width:18px; height:18px;">
+      Remember me for 30 days
+    </label>
 
     <button class="btn-dark" type="submit">Continue</button>
 

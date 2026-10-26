@@ -29,20 +29,10 @@
     <div class="row">
       <div>
         <div class="label">Private Profile</div>
-        <div class="desc">Only approved followers can see your profile.</div>
+        <div class="desc">Other readers can't see your profile's reviews. Your reviews still appear on book pages, but as "A reader".</div>
       </div>
       <label class="toggle">
         <input type="checkbox" name="profile_private" {% if profile_private %}checked{% endif %} onchange="this.form.submit()">
-        <span class="knob"></span>
-      </label>
-    </div>
-    <div class="row">
-      <div>
-        <div class="label">Show Activity</div>
-        <div class="desc">Display your recent activity to followers.</div>
-      </div>
-      <label class="toggle">
-        <input type="checkbox" name="show_activity" {% if show_activity %}checked{% endif %} onchange="this.form.submit()">
         <span class="knob"></span>
       </label>
     </div>

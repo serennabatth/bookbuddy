@@ -371,7 +371,12 @@
       {% if is_own %}<a href="{{ url_for('my_reviews') }}" class="seeall">See all</a>{% endif %}
     </div>
 
-    {% if your_reviews and your_reviews|length %}
+    {% if is_private_view %}
+      <div class="empty-state">
+        <div class="title">This profile is private</div>
+        Their reviews aren't shown here.
+      </div>
+    {% elif your_reviews and your_reviews|length %}
       <div class="grid">
         {% for r in your_reviews %}
           <a href="{{ url_for('book_details', book_id=r.book_id) }}" class="review-card">
