@@ -178,7 +178,7 @@
       try {
         const res = await fetch('{{ url_for("api_following_toggle") }}', {
           method: 'POST',
-          headers: {'Content-Type': 'application/json'},
+          headers: csrfHeaders(),
           body: JSON.stringify({handle})
         });
         const json = await res.json();

@@ -23,6 +23,7 @@
 
 <div class="page">
   <form class="group" method="post" action="{{ url_for('notifications_settings') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="row">
       <div>
         <div style="font-weight:600;">Push notifications</div>

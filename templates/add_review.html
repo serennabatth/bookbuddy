@@ -298,6 +298,7 @@
 
   <!-- hidden real post form -->
   <form id="postForm" action="{{ url_for('add_review') }}" method="post" style="display:none;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="book_title" id="bookTitle">
     <input type="hidden" name="review" id="reviewField">
     <input type="hidden" name="rating" id="ratingField" value="0">

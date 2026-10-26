@@ -10,6 +10,7 @@ from flask_login import (
 from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
 from flask_migrate import Migrate
+from flask_wtf.csrf import CSRFProtect, CSRFError
 from io import BytesIO
 import qrcode
 import qrcode.image.pil  # ensure PIL backend available
@@ -69,6 +70,24 @@ db = SQLAlchemy(app)
 # render_as_batch lets Alembic change columns on SQLite, which can't ALTER
 # most things in place: it copies the table, changes it and swaps it back.
 migrate = Migrate(app, db, render_as_batch=True)
+
+# CSRF protection: every POST must carry a secret token that only pages from
+# this site know, so another website can't submit forms as a logged-in user.
+# Forms send it as a hidden "csrf_token" field; fetch() calls send it in an
+# "X-CSRFToken" header (see base.html).
+csrf = CSRFProtect(app)
+
+
+@app.errorhandler(CSRFError)
+def handle_csrf_error(error: CSRFError):
+    """Explain a missing or expired token instead of showing a bare 400 page."""
+    message = "Your session expired or the form was out of date. Please try again."
+    if request.path.startswith("/api/") or request.is_json:
+        return jsonify({"ok": False, "error": message}), 400
+    flash(message, "error")
+    if request.endpoint == "logout":
+        return redirect(url_for("home"))
+    return redirect(request.path)
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
 
@@ -943,7 +962,7 @@ def favourites():
 @app.post("/api/favourites/toggle")
 @login_required
 def api_favourites_toggle():
-    data = request.get_json(force=True) or {}
+    data = request.get_json(silent=True) or {}
     book_id = int(data.get("book_id") or 0)
     if not book_id:
         return jsonify({"ok": False, "error": "missing book_id"}), 400
@@ -996,7 +1015,7 @@ def history():
 @app.post("/api/history/add")
 @login_required
 def api_history_add():
-    data = request.get_json(force=True) or {}
+    data = request.get_json(silent=True) or {}
     book_id = int(data.get("book_id") or 0)
     if not book_id:
         return jsonify({"ok": False, "error": "missing book_id"}), 400
@@ -1064,7 +1083,7 @@ def followers():
 
 @app.route("/api/following/toggle", methods=["POST"])
 def api_following_toggle():
-    data = request.get_json(force=True) or {}
+    data = request.get_json(silent=True) or {}
     handle = (data.get("handle") or "").strip()
     if not handle:
         return {"ok": False, "error": "missing handle"}, 400
@@ -1081,7 +1100,7 @@ def api_following_toggle():
 
 @app.route("/api/followers/remove", methods=["POST"])
 def api_followers_remove():
-    data = request.get_json(force=True) or {}
+    data = request.get_json(silent=True) or {}
     handle = (data.get("handle") or "").strip()
     if not handle:
         return {"ok": False, "error": "missing handle"}, 400
@@ -1441,7 +1460,7 @@ def login():
     return render_template("sign_in.html")
 
 
-@app.route("/logout")
+@app.route("/logout", methods=["POST"])
 def logout():
     logout_user()
     return redirect(url_for("login"))

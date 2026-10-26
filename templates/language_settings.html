@@ -99,6 +99,7 @@
   <div class="section-label">App</div>
 
   <form method="POST" action="{{ url_for('language_settings') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="list">
       {% for lang in langs %}
         <label class="row" for="lang_{{ loop.index }}">

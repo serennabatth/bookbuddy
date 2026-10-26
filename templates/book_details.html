@@ -139,7 +139,7 @@
       try {
         await fetch("/api/history/add", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: csrfHeaders(),
           credentials: "same-origin",
           body: JSON.stringify({ book_id: BOOK_ID })
         });
@@ -160,7 +160,7 @@
       try {
         const res = await fetch("/api/favourites/toggle", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: csrfHeaders(),
           credentials: "same-origin",
           body: JSON.stringify({ book_id: BOOK_ID })
         });

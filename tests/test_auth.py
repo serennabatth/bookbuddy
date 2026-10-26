@@ -24,9 +24,14 @@ def test_signup_stores_a_hashed_password(client):
 
 def test_login_with_wrong_password_is_rejected(client):
     client.post("/signup", data={"email": "a@example.com", "password": "right-password"})
-    client.get("/logout")
+    client.post("/logout")
 
     response = client.post("/login", data={"email": "a@example.com", "password": "wrong"})
 
     assert response.status_code == 302
     assert response.headers["Location"].endswith("/login")  # sent back, not let in
+
+
+def test_logout_only_accepts_post(client):
+    # A GET logout could be triggered by any image or link on another site.
+    assert client.get("/logout").status_code == 405

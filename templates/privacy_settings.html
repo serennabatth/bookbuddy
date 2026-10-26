@@ -25,6 +25,7 @@
 
 <div class="page">
   <form class="group" method="post" action="{{ url_for('privacy_settings') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="row">
       <div>
         <div class="label">Private Profile</div>

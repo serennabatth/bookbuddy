@@ -11,3 +11,4 @@ qrcode==8.2
 pillow==12.0.0
 Flask-Migrate==4.1.0   # new: database migrations (installs Alembic)
 python-dotenv==1.1.0   # new: reads settings from .env
+Flask-WTF==1.2.2       # new in task 2: CSRF protection

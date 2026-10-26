@@ -248,6 +248,7 @@
 
   <!-- Form -->
   <form id="bookForm" action="{{ url_for('add_book') }}" method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
     <div class="field">
       <label class="label">Title</label>

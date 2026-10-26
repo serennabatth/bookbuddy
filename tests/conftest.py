@@ -16,8 +16,12 @@ from main import app as flask_app, db  # noqa: E402
 
 @pytest.fixture
 def app():
-    """A fresh, empty database for every test."""
-    flask_app.config.update(TESTING=True)
+    """A fresh, empty database for every test.
+
+    CSRF checks are switched off here so tests can post forms directly.
+    tests/test_csrf.py switches them back on to prove they work.
+    """
+    flask_app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)
     with flask_app.app_context():
         db.create_all()
         yield flask_app

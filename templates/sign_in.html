@@ -149,6 +149,7 @@
   <div class="title">Login</div>
 
   <form method="POST" action="{{ url_for('login') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="field">
       <label class="label" for="username">Username</label>
       <input id="username" name="username" class="input" type="text" placeholder="email@domain.com" required>
